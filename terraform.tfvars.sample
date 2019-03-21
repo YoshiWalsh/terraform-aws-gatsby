@@ -1,0 +1,4 @@
+domain = "www.example.com"
+domain_route53_zones = {
+    "www.example.com" = "example.com."
+}
