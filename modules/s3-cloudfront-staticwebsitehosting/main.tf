@@ -2,9 +2,18 @@ resource "aws_s3_bucket" "gatsby_static_bucket" {
     bucket_prefix = "${var.domain}-"
 
     website {
-        index_document = "index.html"
-        error_document = "404.html"
+        index_document = "${var.index_document}"
+        error_document = "${var.error_document}"
     }
+}
+
+resource "aws_s3_bucket_public_access_block" "gatsby_static_bucket_publicaccess" {
+    bucket = "${aws_s3_bucket.gatsby_static_bucket.id}"
+
+    block_public_acls = false
+    block_public_policy = false
+    ignore_public_acls = false
+    restrict_public_buckets = false
 }
 
 data "aws_iam_policy_document" "gatsby_static_bucket_policy_document" {
