@@ -38,3 +38,15 @@ variable "cache_all_objects" {
     default = "false"
     description = "Forces caching for all objects, including HTML files. Slightly improves load-times. If this is enabled, you MUST create a CloudFront Invalidation every time you update your site."
 }
+
+variable "index_document" {
+    type = "string"
+    default = "index.html"
+    description = "The name of the index document within each directory."
+}
+
+variable "error_document" {
+    type = "string"
+    default = "404.html"
+    description = "The path to the page that should be returned if the user requests a non-existent key."
+}

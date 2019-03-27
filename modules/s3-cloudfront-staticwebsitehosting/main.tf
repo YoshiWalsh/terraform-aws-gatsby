@@ -2,8 +2,8 @@ resource "aws_s3_bucket" "gatsby_static_bucket" {
     bucket_prefix = "${var.domain}-"
 
     website {
-        index_document = "index.html"
-        error_document = "404.html"
+        index_document = "${var.index_document}"
+        error_document = "${var.error_document}"
     }
 }
 

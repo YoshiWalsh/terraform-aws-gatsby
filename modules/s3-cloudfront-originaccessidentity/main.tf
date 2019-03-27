@@ -51,8 +51,25 @@ locals {
     https = "${var.acm_certificate_arn != "" || var.iam_certificate_id != ""}"
 }
 
+resource "aws_iam_role" "gatsby_lambda_role" {
+  name = "${replace("${var.domain}", ".", "-")}_lambda"
+
+
+  assume_role_policy = "${file("${path.module}/data/gatsby_lambda_role_assumepolicy.json")}"
+}
+
+resource "aws_iam_role_policy" "gatsby_lambda_role_policy" {
+  name = "${replace("${var.domain}", ".", "-")}_lambda"
+  role = "${aws_iam_role.gatsby_lambda_role.id}"
+
+  policy = "${file("${path.module}/data/gatsby_lambda_role_policy.json")}"
+}
+
 data "template_file" "gatsby_originrequest_lambda_template" {
     template = "${file("${path.module}/data/originrequest_lambda/index.js.tpl")}"
+    vars = {
+        index_document = "${var.index_document}"
+    }
 }
 
 data "archive_file" "gatsby_originrequest_lambda_archive" {
@@ -65,33 +82,51 @@ data "archive_file" "gatsby_originrequest_lambda_archive" {
     }
 }
 
-resource "aws_iam_role" "gatsby_originrequest_lambda_role" {
-  name = "${replace("${var.domain}", ".", "-")}_originrequest"
-
-
-  assume_role_policy = "${file("${path.module}/data/gatsby_originrequest_lambda_role_assumepolicy.json")}"
-}
-
-resource "aws_iam_role_policy" "gatsby_originrequest_lambda_role_policy" {
-  name = "${replace("${var.domain}", ".", "-")}_originrequest"
-  role = "${aws_iam_role.gatsby_originrequest_lambda_role.id}"
-
-  policy = "${file("${path.module}/data/gatsby_originrequest_lambda_role_policy.json")}"
-}
-
 resource "aws_lambda_function" "gatsby_originrequest_lambda" {
-  filename = "${path.module}/artifacts/originrequest_lambda.zip"
-  function_name = "${replace("${var.domain}", ".", "-")}_originrequest"
-  role = "${aws_iam_role.gatsby_originrequest_lambda_role.arn}"
-  handler = "index.handler"
-  
-  source_code_hash = "${data.archive_file.gatsby_originrequest_lambda_archive.output_base64sha256}"
-  runtime = "nodejs8.10"
-  publish = true
+    filename = "${path.module}/artifacts/originrequest_lambda.zip"
+    function_name = "${replace("${var.domain}", ".", "-")}_originrequest"
+    role = "${aws_iam_role.gatsby_lambda_role.arn}"
+    handler = "index.handler"
 
-  lifecycle {
-      create_before_destroy = true
-  }
+    source_code_hash = "${data.archive_file.gatsby_originrequest_lambda_archive.output_base64sha256}"
+    runtime = "nodejs8.10"
+    publish = true
+
+    lifecycle {
+        create_before_destroy = true
+    }
+}
+
+data "template_file" "gatsby_originresponse_lambda_template" {
+    template = "${file("${path.module}/data/originresponse_lambda/index.js.tpl")}"
+    vars = {
+        index_document = "${var.index_document}"
+    }
+}
+
+data "archive_file" "gatsby_originresponse_lambda_archive" {
+    type = "zip"
+    output_path = "${path.module}/artifacts/originresponse_lambda.zip"
+
+    source {
+        filename = "index.js"
+        content = "${data.template_file.gatsby_originresponse_lambda_template.rendered}"
+    }
+}
+
+resource "aws_lambda_function" "gatsby_originresponse_lambda" {
+    filename = "${path.module}/artifacts/originresponse_lambda.zip"
+    function_name = "${replace("${var.domain}", ".", "-")}_originresponse"
+    role = "${aws_iam_role.gatsby_lambda_role.arn}"
+    handler = "index.handler"
+
+    source_code_hash = "${data.archive_file.gatsby_originresponse_lambda_archive.output_base64sha256}"
+    runtime = "nodejs8.10"
+    publish = true
+
+    lifecycle {
+        create_before_destroy = true
+    }
 }
 
 resource "aws_cloudfront_distribution" "gatsby_static_distribution" {
@@ -142,5 +177,16 @@ resource "aws_cloudfront_distribution" "gatsby_static_distribution" {
             lambda_arn = "${aws_lambda_function.gatsby_originrequest_lambda.qualified_arn}"
             include_body = false
         }
+        lambda_function_association {
+            event_type = "origin-response"
+            lambda_arn = "${aws_lambda_function.gatsby_originresponse_lambda.qualified_arn}"
+            include_body = false
+        }
+    }
+
+    custom_error_response {
+        error_code = 403
+        response_code = 404
+        response_page_path = "/${var.error_document}"
     }
 }
