@@ -50,3 +50,27 @@ variable "error_document" {
     default = "404.html"
     description = "The path to the page that should be returned if the user requests a non-existent key."
 }
+
+variable "cloudfront_lambda_viewerrequest" {
+    type = "string"
+    default = ""
+    description = "A list of qualified ARNs for published Lambda functions that should be registered with the CloudFront distribution's viewer request event."
+}
+
+variable "cloudfront_lambda_originrequest" {
+    type = "string"
+    default = ""
+    description = "A list of qualified ARNs for published Lambda functions that should be registered with the CloudFront distribution's origin request event."
+}
+
+variable "cloudfront_lambda_originresponse" {
+    type = "string"
+    default = ""
+    description = "A list of qualified ARNs for published Lambda functions that should be registered with the CloudFront distribution's origin response event."
+}
+
+variable "cloudfront_lambda_viewerresponse" {
+    type = "string"
+    default = ""
+    description = "A list of qualified ARNs for published Lambda functions that should be registered with the CloudFront distribution's viewer response event."
+}

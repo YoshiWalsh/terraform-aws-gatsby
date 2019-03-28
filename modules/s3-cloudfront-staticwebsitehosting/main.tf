@@ -93,5 +93,26 @@ resource "aws_cloudfront_distribution" "gatsby_static_distribution" {
             }
             query_string = false
         }
+        
+        lambda_function_association {
+            event_type = "${var.cloudfront_lambda_viewerrequest == "" ? "" : "viewer-request"}"
+            lambda_arn = "${var.cloudfront_lambda_viewerrequest == "" ? "" : var.cloudfront_lambda_viewerrequest}"
+            include_body = false
+        }
+        lambda_function_association {
+            event_type = "${var.cloudfront_lambda_originrequest == "" ? "" : "origin-request"}"
+            lambda_arn = "${var.cloudfront_lambda_originrequest == "" ? "" : var.cloudfront_lambda_originrequest}"
+            include_body = false
+        }
+        lambda_function_association {
+            event_type = "${var.cloudfront_lambda_originresponse == "" ? "" : "origin-response"}"
+            lambda_arn = "${var.cloudfront_lambda_originresponse == "" ? "" : var.cloudfront_lambda_originresponse}"
+            include_body = false
+        }
+        lambda_function_association {
+            event_type = "${var.cloudfront_lambda_viewerresponse == "" ? "" : "viewer-response"}"
+            lambda_arn = "${var.cloudfront_lambda_viewerresponse == "" ? "" : var.cloudfront_lambda_viewerresponse}"
+            include_body = false
+        }
     }
 }

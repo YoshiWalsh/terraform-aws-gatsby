@@ -2,8 +2,10 @@
 
 var URL = require('url').URL;
 var path = require('path');
+var AWS = require('aws-sdk');
 
 var directoryIndexKey = "${index_document}";
+var passthroughFunctionQualifiedArn = "${passthrough}";
 
 exports.handler = (event, context, callback) => {
     var cf = event.Records[0].cf;
@@ -26,6 +28,26 @@ exports.handler = (event, context, callback) => {
         }];
         console.log("301 redirecting to ", uri);
     }
-    
-    return callback(null, response);
+
+    if (passthroughFunctionQualifiedArn) {
+        var lambda = new AWS.Lambda({
+            region: 'us-east-1'
+        });
+
+        var qualifiedArnSplitter = passthroughFunctionQualifiedArn.lastIndexOf(":");
+        var unqualifiedArn = passthroughFunctionQualifiedArn.slice(0, qualifiedArnSplitter);
+        var qualifier = passthroughFunctionQualifiedArn.slice(qualifiedArnSplitter + 1);
+        lambda.invoke({
+            InvocationType: "RequestResponse",
+            FunctionName: unqualifiedArn,
+            Qualifier: qualifier
+            Payload: JSON.stringify(event),
+        }, function(err, data) {
+            callback(err, JSON.parse(data));
+        });
+    } else {
+        callback(null, response);
+    }
+
+    return;
 };

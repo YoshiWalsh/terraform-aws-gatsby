@@ -69,6 +69,7 @@ data "template_file" "gatsby_originrequest_lambda_template" {
     template = "${file("${path.module}/data/originrequest_lambda/index.js.tpl")}"
     vars = {
         index_document = "${var.index_document}"
+        passthrough = "${var.cloudfront_lambda_originrequest}"
     }
 }
 
@@ -101,6 +102,7 @@ data "template_file" "gatsby_originresponse_lambda_template" {
     template = "${file("${path.module}/data/originresponse_lambda/index.js.tpl")}"
     vars = {
         index_document = "${var.index_document}"
+        passthrough = "${var.cloudfront_lambda_originresponse}"
     }
 }
 
@@ -180,6 +182,28 @@ resource "aws_cloudfront_distribution" "gatsby_static_distribution" {
         lambda_function_association {
             event_type = "origin-response"
             lambda_arn = "${aws_lambda_function.gatsby_originresponse_lambda.qualified_arn}"
+            include_body = false
+        }
+        
+        lambda_function_association {
+            event_type = "${var.cloudfront_lambda_viewerrequest == "" ? "" : "viewer-request"}"
+            lambda_arn = "${var.cloudfront_lambda_viewerrequest == "" ? "" : var.cloudfront_lambda_viewerrequest}"
+            include_body = false
+        }
+        # Can't do this because the origin-request and origin-response Lambda functions are already used. Instead, those functions include a pass-through mechanism.
+        /*lambda_function_association {
+            event_type = "${var.cloudfront_lambda_originrequest == "" ? "" : "origin-request"}"
+            lambda_arn = "${var.cloudfront_lambda_originrequest == "" ? "" : var.cloudfront_lambda_originrequest}"
+            include_body = false
+        }
+        lambda_function_association {
+            event_type = "${var.cloudfront_lambda_originresponse == "" ? "" : "origin-response"}"
+            lambda_arn = "${var.cloudfront_lambda_originresponse == "" ? "" : var.cloudfront_lambda_originresponse}"
+            include_body = false
+        }*/
+        lambda_function_association {
+            event_type = "${var.cloudfront_lambda_viewerresponse == "" ? "" : "viewer-response"}"
+            lambda_arn = "${var.cloudfront_lambda_viewerresponse == "" ? "" : var.cloudfront_lambda_viewerresponse}"
             include_body = false
         }
     }
