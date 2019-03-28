@@ -11,16 +11,10 @@ exports.handler = (event, context, callback) => {
     var response = cf.response;
     console.log("Processing response for URI: " + uri);
     console.log("Original response code: " + response.status);
-    
-    // Discard query string & hash
-    var urlObject = new URL("https://www.example.com" + uri);
-    uri = urlObject.pathname;
 
     if (response.status === "403" && uri.slice(-1) !== "/" && uri.slice(0 - directoryIndexKey.length) !== directoryIndexKey) {
         // Add trailing slash
         uri += '/';
-        // Restore query string & hash
-        uri += urlObject.search + urlObject.hash;
 
         // Redirect
         response.status = "301";
