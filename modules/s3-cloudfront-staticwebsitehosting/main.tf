@@ -47,72 +47,49 @@ locals {
     https = "${var.acm_certificate_arn != "" || var.iam_certificate_id != ""}"
 }
 
-resource "aws_cloudfront_distribution" "gatsby_static_distribution" {
+module "gatsby_static_distribution" {
+    source = "../cloudfront-distribution-optional-lambdas"
+
     enabled = true
     aliases = ["${var.domain}"]
-
     http_version = "http2"
     is_ipv6_enabled = true
-    restrictions {
-        geo_restriction {
-            restriction_type = "none"
-        }
-    }
 
-    origin {
-        origin_id = "main"
-        domain_name = "${aws_s3_bucket.gatsby_static_bucket.website_endpoint}"
+    origin_domain_name = "${aws_s3_bucket.gatsby_static_bucket.website_endpoint}"
+    custom_origin_http_port = "80"
+    custom_origin_https_port = "443"
+    custom_origin_protocol_policy = "http-only"
+    custom_origin_ssl_protocols = ["TLSv1", "TLSv1.1", "TLSv1.2"]
 
-        custom_origin_config {
-            http_port = "80"
-            https_port = "443"
-            origin_protocol_policy = "http-only"
-            origin_ssl_protocols = ["TLSv1", "TLSv1.1", "TLSv1.2"]
-        }
-    }
+    acm_certificate_arn = "${var.acm_certificate_arn}"
+    iam_certificate_id = "${var.iam_certificate_id}"
+    minimum_protocol_version = "${var.https_minimum_protocol_version}"
+    ssl_support_method = "${var.https_support_non_sni ? "vip" : "sni-only"}"
 
-    viewer_certificate {
-        acm_certificate_arn = "${var.acm_certificate_arn}"
-        iam_certificate_id = "${var.iam_certificate_id}"
-        minimum_protocol_version = "${var.https_minimum_protocol_version}"
-        ssl_support_method = "${var.https_support_non_sni == "true" ? "vip" : "sni-only"}"
-    }
+    min_ttl = "${var.cache_all_objects ? 31536000 : 0}"
+    default_ttl = "${var.cache_all_objects ? 31536000 : 0}"
+    max_ttl = 31536000
+    compress = true
+    viewer_protocol_policy = "${var.https_redirect ? "redirect-to-https" : "allow-all"}"
+    allowed_methods = ["GET", "HEAD", "OPTIONS"]
+    cached_methods = ["GET", "HEAD", "OPTIONS"]
+    forward_cookies = "none"
+    forward_query = false
 
-    default_cache_behavior {
-        target_origin_id = "main"
-        min_ttl = "${var.cache_all_objects == "true" ? 31536000 : 0}"
-        default_ttl = "${var.cache_all_objects == "true" ? 31536000 : 0}"
-        max_ttl = 31536000
-        compress = true
-        viewer_protocol_policy = "${var.https_redirect == "true" ? "redirect-to-https" : "allow-all"}"
-        allowed_methods = ["GET", "HEAD", "OPTIONS"]
-        cached_methods = ["GET", "HEAD", "OPTIONS"]
-        forwarded_values {
-            cookies {
-                forward = "none"
-            }
-            query_string = false
-        }
-        
-        lambda_function_association {
-            event_type = "${var.cloudfront_lambda_viewerrequest == "" ? "" : "viewer-request"}"
-            lambda_arn = "${var.cloudfront_lambda_viewerrequest == "" ? "" : var.cloudfront_lambda_viewerrequest}"
-            include_body = false
-        }
-        lambda_function_association {
-            event_type = "${var.cloudfront_lambda_originrequest == "" ? "" : "origin-request"}"
-            lambda_arn = "${var.cloudfront_lambda_originrequest == "" ? "" : var.cloudfront_lambda_originrequest}"
-            include_body = false
-        }
-        lambda_function_association {
-            event_type = "${var.cloudfront_lambda_originresponse == "" ? "" : "origin-response"}"
-            lambda_arn = "${var.cloudfront_lambda_originresponse == "" ? "" : var.cloudfront_lambda_originresponse}"
-            include_body = false
-        }
-        lambda_function_association {
-            event_type = "${var.cloudfront_lambda_viewerresponse == "" ? "" : "viewer-response"}"
-            lambda_arn = "${var.cloudfront_lambda_viewerresponse == "" ? "" : var.cloudfront_lambda_viewerresponse}"
-            include_body = false
-        }
-    }
+    custom_response_403_enabled = true
+    custom_response_403_code = "404"
+    custom_response_403_page_path = "/${var.error_document}"
+    
+    viewerrequest_lambda_enabled = "${var.cloudfront_lambda_viewerrequest_enabled}"
+    viewerrequest_lambda_qualifiedarn = "${var.cloudfront_lambda_viewerrequest_qualifiedarn}"
+    viewerrequest_lambda_includebody = false
+    originrequest_lambda_enabled = "${var.cloudfront_lambda_originrequest_enabled}"
+    originrequest_lambda_qualifiedarn = "${var.cloudfront_lambda_originrequest_qualifiedarn}"
+    originrequest_lambda_includebody = false
+    originresponse_lambda_enabled = "${var.cloudfront_lambda_originresponse_enabled}"
+    originresponse_lambda_qualifiedarn = "${var.cloudfront_lambda_originresponse_qualifiedarn}"
+    originresponse_lambda_includebody = false
+    viewerresponse_lambda_enabled = "${var.cloudfront_lambda_viewerresponse_enabled}"
+    viewerresponse_lambda_qualifiedarn = "${var.cloudfront_lambda_viewerresponse_qualifiedarn}"
+    viewerresponse_lambda_includebody = false
 }

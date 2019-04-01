@@ -23,7 +23,7 @@ variable "https_minimum_protocol_version" {
 
 variable "https_support_non_sni" {
     type = "string"
-    default = "false" # Amazon's recommendation, and likely to stay Amazon's recommendation forever
+    default = false # Amazon's recommendation, and likely to stay Amazon's recommendation forever
     description = "Adds support for browsers which don't support SNI. Involves extra costs. Leaving this false is strongly recommended."
 }
 
@@ -35,7 +35,7 @@ variable "https_redirect" {
 
 variable "cache_all_objects" {
     type = "string"
-    default = "false"
+    default = false
     description = "Forces caching for all objects, including HTML files. Slightly improves load-times. If this is enabled, you MUST create a CloudFront Invalidation every time you update your site."
 }
 
@@ -51,25 +51,49 @@ variable "error_document" {
     description = "The path to the page that should be returned if the user requests a non-existent key."
 }
 
-variable "cloudfront_lambda_viewerrequest" {
+variable "cloudfront_lambda_viewerrequest_enabled" {
+    type = "string"
+    default = false
+    description = "Whether or not to enable the viewer request Lambda@Edge function."
+}
+
+variable "cloudfront_lambda_viewerrequest_qualifiedarn" {
     type = "string"
     default = ""
     description = "A list of qualified ARNs for published Lambda functions that should be registered with the CloudFront distribution's viewer request event."
 }
 
-variable "cloudfront_lambda_originrequest" {
+variable "cloudfront_lambda_originrequest_enabled" {
+    type = "string"
+    default = false
+    description = "Whether or not to enable the origin request Lambda@Edge function."
+}
+
+variable "cloudfront_lambda_originrequest_qualifiedarn" {
     type = "string"
     default = ""
     description = "A list of qualified ARNs for published Lambda functions that should be registered with the CloudFront distribution's origin request event."
 }
 
-variable "cloudfront_lambda_originresponse" {
+variable "cloudfront_lambda_originresponse_enabled" {
+    type = "string"
+    default = false
+    description = "Whether or not to enable the origin response Lambda@Edge function."
+}
+
+variable "cloudfront_lambda_originresponse_qualifiedarn" {
     type = "string"
     default = ""
     description = "A list of qualified ARNs for published Lambda functions that should be registered with the CloudFront distribution's origin response event."
 }
 
-variable "cloudfront_lambda_viewerresponse" {
+variable "cloudfront_lambda_viewerresponse_enabled" {
+    type = "string"
+    default = false
+    description = "Whether or not to enable the viewer response Lambda@Edge function."
+}
+
+variable "cloudfront_lambda_viewerresponse_qualifiedarn" {
     type = "string"
     default = ""
     description = "A list of qualified ARNs for published Lambda functions that should be registered with the CloudFront distribution's viewer response event."

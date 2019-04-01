@@ -3,9 +3,9 @@ output "static_s3_bucket_name" {
 }
 
 output "cf_distribution_domain" {
-    value = "${aws_cloudfront_distribution.gatsby_static_distribution.domain_name}"
+    value = "${module.gatsby_static_distribution.domain_name}"
 }
 
 output "cf_distribution_zone_id" {
-    value = "${aws_cloudfront_distribution.gatsby_static_distribution.hosted_zone_id}"
+    value = "${module.gatsby_static_distribution.hosted_zone_id}"
 }
