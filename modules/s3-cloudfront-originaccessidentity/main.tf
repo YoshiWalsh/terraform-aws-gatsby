@@ -69,6 +69,7 @@ data "template_file" "gatsby_originrequest_lambda_template" {
     template = "${file("${path.module}/data/originrequest_lambda/index.js.tpl")}"
     vars = {
         index_document = "${var.index_document}"
+        passthrough = "${var.cloudfront_lambda_originrequest_enabled ? var.cloudfront_lambda_originrequest_qualifiedarn : ""}"
     }
 }
 
@@ -101,6 +102,7 @@ data "template_file" "gatsby_originresponse_lambda_template" {
     template = "${file("${path.module}/data/originresponse_lambda/index.js.tpl")}"
     vars = {
         index_document = "${var.index_document}"
+        passthrough = "${var.cloudfront_lambda_originresponse_enabled ? var.cloudfront_lambda_originresponse_qualifiedarn : ""}"
     }
 }
 
@@ -129,7 +131,51 @@ resource "aws_lambda_function" "gatsby_originresponse_lambda" {
     }
 }
 
-resource "aws_cloudfront_distribution" "gatsby_static_distribution" {
+module "gatsby_static_distribution" {
+    source = "../cloudfront-distribution-optional-lambdas"
+
+    enabled = true
+    aliases = ["${var.domain}"]
+    http_version = "http2"
+    is_ipv6_enabled = true
+
+    origin_domain_name = "${aws_s3_bucket.gatsby_static_bucket.bucket_regional_domain_name}"
+    origin_access_identity = "${aws_cloudfront_origin_access_identity.gatsby_oai.cloudfront_access_identity_path}"
+
+    acm_certificate_arn = "${var.acm_certificate_arn}"
+    iam_certificate_id = "${var.iam_certificate_id}"
+    minimum_protocol_version = "${var.https_minimum_protocol_version}"
+    ssl_support_method = "${var.https_support_non_sni ? "vip" : "sni-only"}"
+
+    min_ttl = "${var.cache_all_objects ? 31536000 : 0}"
+    default_ttl = "${var.cache_all_objects ? 31536000 : 0}"
+    max_ttl = 31536000
+    compress = true
+    viewer_protocol_policy = "${var.https_redirect ? "redirect-to-https" : "allow-all"}"
+    allowed_methods = ["GET", "HEAD", "OPTIONS"]
+    cached_methods = ["GET", "HEAD", "OPTIONS"]
+    forward_cookies = "none"
+    forward_query = false
+
+    custom_response_403_enabled = true
+    custom_response_403_code = "404"
+    custom_response_403_page_path = "/${var.error_document}"
+    
+    viewerrequest_lambda_enabled = "${var.cloudfront_lambda_viewerrequest_enabled}"
+    viewerrequest_lambda_qualifiedarn = "${var.cloudfront_lambda_viewerrequest_qualifiedarn}"
+    viewerrequest_lambda_includebody = false
+    originrequest_lambda_enabled = true
+    originrequest_lambda_qualifiedarn = "${aws_lambda_function.gatsby_originrequest_lambda.qualified_arn}"
+    originrequest_lambda_includebody = false
+    originresponse_lambda_enabled = true
+    originresponse_lambda_qualifiedarn = "${aws_lambda_function.gatsby_originresponse_lambda.qualified_arn}"
+    originresponse_lambda_includebody = false
+    viewerresponse_lambda_enabled = "${var.cloudfront_lambda_viewerresponse_enabled}"
+    viewerresponse_lambda_qualifiedarn = "${var.cloudfront_lambda_viewerresponse_qualifiedarn}"
+    viewerresponse_lambda_includebody = false
+}
+
+/*resource "aws_cloudfront_distribution" "gatsby_static_distribution" {
     enabled = true
     aliases = ["${var.domain}"]
 
@@ -154,16 +200,16 @@ resource "aws_cloudfront_distribution" "gatsby_static_distribution" {
         acm_certificate_arn = "${var.acm_certificate_arn}"
         iam_certificate_id = "${var.iam_certificate_id}"
         minimum_protocol_version = "${var.https_minimum_protocol_version}"
-        ssl_support_method = "${var.https_support_non_sni == "true" ? "vip" : "sni-only"}"
+        ssl_support_method = "${var.https_support_non_sni ? "vip" : "sni-only"}"
     }
 
     default_cache_behavior {
         target_origin_id = "main"
-        min_ttl = "${var.cache_all_objects == "true" ? 31536000 : 0}"
-        default_ttl = "${var.cache_all_objects == "true" ? 31536000 : 0}"
+        min_ttl = "${var.cache_all_objects ? 31536000 : 0}"
+        default_ttl = "${var.cache_all_objects ? 31536000 : 0}"
         max_ttl = 31536000
         compress = true
-        viewer_protocol_policy = "${var.https_redirect == "true" ? "redirect-to-https" : "allow-all"}"
+        viewer_protocol_policy = "${var.https_redirect ? "redirect-to-https" : "allow-all"}"
         allowed_methods = ["GET", "HEAD", "OPTIONS"]
         cached_methods = ["GET", "HEAD", "OPTIONS"]
         forwarded_values {
@@ -182,6 +228,28 @@ resource "aws_cloudfront_distribution" "gatsby_static_distribution" {
             lambda_arn = "${aws_lambda_function.gatsby_originresponse_lambda.qualified_arn}"
             include_body = false
         }
+        
+        lambda_function_association {
+            event_type = "${var.cloudfront_lambda_viewerrequest == "" ? "" : "viewer-request"}"
+            lambda_arn = "${var.cloudfront_lambda_viewerrequest == "" ? "" : var.cloudfront_lambda_viewerrequest}"
+            include_body = false
+        }
+        # Can't do this because the origin-request and origin-response Lambda functions are already used. Instead, those functions include a pass-through mechanism.
+        # lambda_function_association {
+        #     event_type = "${var.cloudfront_lambda_originrequest == "" ? "" : "origin-request"}"
+        #     lambda_arn = "${var.cloudfront_lambda_originrequest == "" ? "" : var.cloudfront_lambda_originrequest}"
+        #     include_body = false
+        # }
+        # lambda_function_association {
+        #     event_type = "${var.cloudfront_lambda_originresponse == "" ? "" : "origin-response"}"
+        #     lambda_arn = "${var.cloudfront_lambda_originresponse == "" ? "" : var.cloudfront_lambda_originresponse}"
+        #     include_body = false
+        # }
+        lambda_function_association {
+            event_type = "${var.cloudfront_lambda_viewerresponse == "" ? "" : "viewer-response"}"
+            lambda_arn = "${var.cloudfront_lambda_viewerresponse == "" ? "" : var.cloudfront_lambda_viewerresponse}"
+            include_body = false
+        }
     }
 
     custom_error_response {
@@ -189,4 +257,4 @@ resource "aws_cloudfront_distribution" "gatsby_static_distribution" {
         response_code = 404
         response_page_path = "/${var.error_document}"
     }
-}
+}*/
