@@ -9,6 +9,13 @@
 			],
 			"Effect": "Allow",
 			"Resource": "arn:aws:logs:*:*:*"
+		},
+		{
+			"Action": [
+				"lambda:InvokeFunction"
+			],
+			"Effect": "Allow",
+			"Resource": "*"
 		}
 	]
 }
