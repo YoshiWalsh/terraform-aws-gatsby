@@ -122,7 +122,7 @@ function getLambdaReplacements() {
         "viewer-response"
     ];
 
-    return generateCombinations(lambdaTypes, 3, function(lambdaType, discriminator) {
+    return generateCombinations(lambdaTypes, 2, function(lambdaType, discriminator) {
         var conditions = [];
         var lambdas = [];
 
@@ -131,18 +131,16 @@ function getLambdaReplacements() {
         var lambdaArnVariable = "var." + tfLambdaType + "_lambda_qualifiedarn";
         var lambdaBodyVariable = "var." + tfLambdaType + "_lambda_includebody";
 
-        var functionEnabled = discriminator > 0;
-        var bodyIncluded = discriminator == 2;
+        var functionEnabled = !!discriminator;
 
         if (functionEnabled) {
             conditions.push(lambdaEnabledVariable);
-            conditions.push((bodyIncluded ? '' : '!') + lambdaBodyVariable);
             
             lambdas.push([
                 'lambda_function_association {',
                 '    event_type = "' + lambdaType + '"',
                 '    lambda_arn = "${' + lambdaArnVariable + '}"',
-                '    include_body = ' +  (bodyIncluded ? 'true' : 'false'),
+                '    include_body = "${' + lambdaBodyVariable + '}"',
                 '}',
             ].join("\n"));
         } else {
