@@ -31,10 +31,17 @@ exports.handler = (event, context, callback) => {
         lambda.invoke({
             InvocationType: "RequestResponse",
             FunctionName: unqualifiedArn,
-            Qualifier: qualifier
+            Qualifier: qualifier,
             Payload: JSON.stringify(event),
         }, function(err, data) {
-            callback(err, JSON.parse(data));
+            if(err) {
+                callback(err, null);
+                return;
+            }
+            if(data.FunctionError) {
+                callback("User-defined lambda function returned an error: " + data.Payload, null);
+            }
+            callback(null, JSON.parse(data.Payload));
         });
     } else {
         callback(null, request);
