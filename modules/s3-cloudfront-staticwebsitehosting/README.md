@@ -1,0 +1,1 @@
+This module sets up an S3 bucket and CloudFront distribution using S3's Static Website Hosting feature.

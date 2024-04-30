@@ -4,7 +4,7 @@ variable "domain" {
 }
 
 variable "domain_route53_zones" {
-    type = map
+    type = "map"
     description = "Used to specify the existing Route53 zones to create each domain within. R53 zone names must include the trailing '.'"
 }
 
