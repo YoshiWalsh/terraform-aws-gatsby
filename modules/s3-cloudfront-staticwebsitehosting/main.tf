@@ -23,7 +23,7 @@ data "aws_s3_bucket" "existing_bucket" {
 resource "aws_s3_bucket_website_configuration" "static_website_configuration" {
     count = (var.use_private_bucket || var.existing_s3_bucket != null) ? 0 : 1
 
-    bucket = aws_s3_bucket.static_bucket[0]
+    bucket = aws_s3_bucket.static_bucket[0].id
     index_document {
         suffix = var.index_document
     }

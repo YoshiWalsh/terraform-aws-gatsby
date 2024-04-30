@@ -1,5 +1,5 @@
 output "static_s3_bucket_name" {
-    value = coalesce(var.existing_s3_bucket, aws_s3_bucket.static_bucket[0].id)
+    value = try(aws_s3_bucket.static_bucket[0].id, var.existing_s3_bucket)
 }
 
 output "cf_distribution_domain" {
@@ -11,5 +11,5 @@ output "cf_distribution_zone_id" {
 }
 
 output "cf_oai_arn" {
-    value = aws_cloudfront_origin_access_identity.oai[0].iam_arn
+    value = try(aws_cloudfront_origin_access_identity.oai[0].iam_arn, null)
 }
