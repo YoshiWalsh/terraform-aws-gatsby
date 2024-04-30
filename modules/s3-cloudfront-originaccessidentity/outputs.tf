@@ -1,11 +1,11 @@
 output "static_s3_bucket_name" {
-    value = aws_s3_bucket.static_bucket.id
+    value = module.staticwebsite.static_s3_bucket_name
 }
 
 output "cf_distribution_domain" {
-    value = aws_cloudfront_distribution.static_distribution.domain_name
+    value = module.staticwebsite.cf_distribution_domain
 }
 
 output "cf_distribution_zone_id" {
-    value = aws_cloudfront_distribution.static_distribution.hosted_zone_id
+    value = module.staticwebsite.cf_distribution_zone_id
 }

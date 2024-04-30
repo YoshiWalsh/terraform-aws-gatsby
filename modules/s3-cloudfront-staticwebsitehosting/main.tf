@@ -3,6 +3,8 @@ resource "aws_s3_bucket" "static_bucket" {
 }
 
 resource "aws_s3_bucket_website_configuration" "static_website_configuration" {
+    count = var.use_private_bucket ? 0 : 1
+
     bucket = aws_s3_bucket.static_bucket
     index_document {
         suffix = var.index_document
@@ -15,10 +17,16 @@ resource "aws_s3_bucket_website_configuration" "static_website_configuration" {
 resource "aws_s3_bucket_public_access_block" "static_bucket_publicaccess" {
     bucket = aws_s3_bucket.static_bucket.id
 
-    block_public_acls = false
-    block_public_policy = false
-    ignore_public_acls = false
-    restrict_public_buckets = false
+    block_public_acls = var.use_private_bucket
+    block_public_policy = var.use_private_bucket
+    ignore_public_acls = var.use_private_bucket
+    restrict_public_buckets = var.use_private_bucket
+}
+
+resource "aws_cloudfront_origin_access_identity" "oai" {
+    count = var.use_private_bucket ? 1 : 0
+    
+    comment = var.domain
 }
 
 data "aws_iam_policy_document" "static_bucket_policy_document" {
@@ -32,8 +40,8 @@ data "aws_iam_policy_document" "static_bucket_policy_document" {
         ]
 
         principals {
-            type = "*"
-            identifiers = ["*"]
+            type = var.use_private_bucket ? "AWS" : "*"
+            identifiers = [var.use_private_bucket ? aws_cloudfront_origin_access_identity.oai[0].iam_arn : "*"]
         }
 
         effect = "Allow"
@@ -48,6 +56,101 @@ resource "aws_s3_bucket_policy" "static_bucket_policy" {
 
 locals {
     https = var.acm_certificate_arn != "" || var.iam_certificate_id != ""
+}
+
+resource "aws_iam_role" "lambda_role" {
+    count = var.use_private_bucket ? 1 : 0
+    
+    name = "${replace("${var.domain}", ".", "-")}_lambda"
+
+    assume_role_policy = file("${path.module}/data/lambda_role_assumepolicy.json")
+}
+
+resource "aws_iam_role_policy" "lambda_role_policy" {
+    count = var.use_private_bucket ? 1 : 0
+    
+    name = "${replace("${var.domain}", ".", "-")}_lambda"
+    role = aws_iam_role.lambda_role[0].id
+
+    policy = file("${path.module}/data/lambda_role_policy.json")
+}
+
+data "template_file" "originrequest_lambda_template" {
+    count = var.use_private_bucket ? 1 : 0
+    
+    template = file("${path.module}/data/originrequest_lambda/index.js.tpl")
+    vars = {
+        index_document = var.index_document
+        passthrough = var.cloudfront_lambda_originrequest_enabled ? var.cloudfront_lambda_originrequest_qualifiedarn : ""
+    }
+}
+
+data "archive_file" "originrequest_lambda_archive" {
+    count = var.use_private_bucket ? 1 : 0
+    
+    type = "zip"
+    output_path = "${path.module}/artifacts/originrequest_lambda.zip"
+
+    source {
+        filename = "index.js"
+        content = data.template_file.originrequest_lambda_template[0].rendered
+    }
+}
+
+resource "aws_lambda_function" "originrequest_lambda" {
+    count = var.use_private_bucket ? 1 : 0
+    
+    filename = "${path.module}/artifacts/originrequest_lambda.zip"
+    function_name = "${replace("${var.domain}", ".", "-")}_originrequest"
+    role = aws_iam_role.lambda_role[0].arn
+    handler = "index.handler"
+
+    source_code_hash = data.archive_file.originrequest_lambda_archive[0].output_base64sha256
+    runtime = "nodejs20.x"
+    publish = true
+
+    lifecycle {
+        create_before_destroy = true
+    }
+}
+
+data "template_file" "originresponse_lambda_template" {
+    count = var.use_private_bucket ? 1 : 0
+    
+    template = file("${path.module}/data/originresponse_lambda/index.js.tpl")
+    vars = {
+        index_document = var.index_document
+        passthrough = var.cloudfront_lambda_originresponse_enabled ? var.cloudfront_lambda_originresponse_qualifiedarn : ""
+    }
+}
+
+data "archive_file" "originresponse_lambda_archive" {
+    count = var.use_private_bucket ? 1 : 0
+    
+    type = "zip"
+    output_path = "${path.module}/artifacts/originresponse_lambda.zip"
+
+    source {
+        filename = "index.js"
+        content = data.template_file.originresponse_lambda_template[0].rendered
+    }
+}
+
+resource "aws_lambda_function" "originresponse_lambda" {
+    count = var.use_private_bucket ? 1 : 0
+    
+    filename = "${path.module}/artifacts/originresponse_lambda.zip"
+    function_name = "${replace("${var.domain}", ".", "-")}_originresponse"
+    role = aws_iam_role.lambda_role[0].arn
+    handler = "index.handler"
+
+    source_code_hash = data.archive_file.originresponse_lambda_archive[0].output_base64sha256
+    runtime = "nodejs20.x"
+    publish = true
+
+    lifecycle {
+        create_before_destroy = true
+    }
 }
 
 resource "aws_cloudfront_distribution" "static_distribution" {
@@ -65,13 +168,25 @@ resource "aws_cloudfront_distribution" "static_distribution" {
 
     origin {
         origin_id = "main"
-        domain_name = aws_s3_bucket.static_bucket.website_endpoint
+        domain_name = var.use_private_bucket ? aws_s3_bucket.static_bucket.bucket_regional_domain_name : aws_s3_bucket_website_configuration.static_website_configuration[0].website_endpoint
 
-        custom_origin_config {
-            http_port = 80
-            https_port = 443
-            origin_protocol_policy = "http-only"
-            origin_ssl_protocols = ["TLSv1", "TLSv1.1", "TLSv1.2"]
+        dynamic custom_origin_config {
+            for_each = var.use_private_bucket ? [] : [true]
+
+            content {
+                http_port = 80
+                https_port = 443
+                origin_protocol_policy = "http-only"
+                origin_ssl_protocols = ["TLSv1", "TLSv1.1", "TLSv1.2"]
+            }
+        }
+
+        dynamic s3_origin_config {
+            for_each = var.use_private_bucket ? [true] : []
+
+            content {
+                origin_access_identity = aws_cloudfront_origin_access_identity.oai[0].cloudfront_access_identity_path
+            }
         }
     }
 
@@ -98,6 +213,7 @@ resource "aws_cloudfront_distribution" "static_distribution" {
             query_string = false
         }
 
+        # User-supplied viewer functions are always used directly
         dynamic lambda_function_association {
             for_each = var.cloudfront_lambda_viewerrequest_enabled ? [true] : []
 
@@ -109,7 +225,18 @@ resource "aws_cloudfront_distribution" "static_distribution" {
         }
 
         dynamic lambda_function_association {
-            for_each = var.cloudfront_lambda_originrequest_enabled
+            for_each = var.cloudfront_lambda_viewerresponse_enabled ? [true] : []
+
+            content {
+                event_type = "viewer-response"
+                lambda_arn = var.cloudfront_lambda_viewerresponse_qualifiedarn
+                include_body = false
+            }
+        }
+
+        # User-supplied origin functions can only be used directly when not using a private bucket
+        dynamic lambda_function_association {
+            for_each = (!var.use_private_bucket && var.cloudfront_lambda_originrequest_enabled) ? [true] : []
 
             content {
                 event_type = "origin-request"
@@ -119,7 +246,7 @@ resource "aws_cloudfront_distribution" "static_distribution" {
         }
 
         dynamic lambda_function_association {
-            for_each = var.cloudfront_lambda_originresponse_enabled
+            for_each = (!var.use_private_bucket && var.cloudfront_lambda_originresponse_enabled) ? [true] : []
 
             content {
                 event_type = "origin-response"
@@ -128,12 +255,26 @@ resource "aws_cloudfront_distribution" "static_distribution" {
             }
         }
 
+        # When using a private bucket, we need to use the two origin
+        # functions to emulate S3 Static Website Hosting's behaviour.
+        # User-supplied origin functions are still supported via a
+        # passthrough mechanism in the Lambda scripts.
         dynamic lambda_function_association {
-            for_each = var.cloudfront_lambda_viewerresponse_enabled ? [true] : []
+            for_each = var.use_private_bucket ? [true] : []
 
             content {
-                event_type = "viewer-response"
-                lambda_arn = var.cloudfront_lambda_viewerresponse_qualifiedarn
+                event_type = "origin-request"
+                lambda_arn = aws_lambda_function.originrequest_lambda[0].qualified_arn
+                include_body = false
+            }
+        }
+
+        dynamic lambda_function_association {
+            for_each = var.use_private_bucket ? [true] : []
+
+            content {
+                event_type = "origin-response"
+                lambda_arn = aws_lambda_function.originresponse_lambda[0].qualified_arn
                 include_body = false
             }
         }

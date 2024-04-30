@@ -10,7 +10,7 @@ variable "acm_certificate_arn" {
 }
 
 variable "iam_certificate_id" {
-    type ="string"
+    type = string
     default = ""
     description = "The ID of the IAM certificate to use when serving pages via HTTPS. Optional, provide either this or acm_certificate_arn if you wish to enable HTTPS."
 }
@@ -97,4 +97,10 @@ variable "cloudfront_lambda_viewerresponse_qualifiedarn" {
     type = string
     default = ""
     description = "A list of qualified ARNs for published Lambda functions that should be registered with the CloudFront distribution's viewer response event."
+}
+
+variable "use_private_bucket" {
+    type = bool
+    default = false
+    description = "Uses an Origin Access Identity and Lambda@Edge in order to replicate S3 Static Website Hosting functionality but with a private bucket."
 }
