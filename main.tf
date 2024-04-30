@@ -7,6 +7,13 @@ provider "aws" {
     region = "us-east-1"
 }
 
+resource "random_id" "environment_identifier" {
+    keepers = {
+    }
+
+    byte_length = 8
+}
+
 data "aws_route53_zone" "primary_zone" {
     name = lookup(var.domain_route53_zones, var.domain, var.domain)
     private_zone = false
@@ -54,7 +61,7 @@ data "archive_file" "test_viewerrequest_lambda_archive" {
 
 resource "aws_lambda_function" "test_viewerrequest_lambda" {
     filename = "${path.module}/artifacts/test_viewerrequest_lambda.zip"
-    function_name = "test_terraform_viewerrequest_lambda"
+    function_name = "gatsby_${random_id.environment_identifier.hex}_viewerrequest"
     role = aws_iam_role.test_lambda_role.arn
     handler = "index.handler"
 
@@ -79,7 +86,7 @@ data "archive_file" "test_originrequest_lambda_archive" {
 
 resource "aws_lambda_function" "test_originrequest_lambda" {
     filename = "${path.module}/artifacts/test_originrequest_lambda.zip"
-    function_name = "test_terraform_originrequest_lambda"
+    function_name = "gatsby_${random_id.environment_identifier.hex}_originrequest"
     role = aws_iam_role.test_lambda_role.arn
     handler = "index.handler"
 
@@ -104,7 +111,7 @@ data "archive_file" "test_originresponse_lambda_archive" {
 
 resource "aws_lambda_function" "test_originresponse_lambda" {
     filename = "${path.module}/artifacts/test_originresponse_lambda.zip"
-    function_name = "test_terraform_originresponse_lambda"
+    function_name = "gatsby_${random_id.environment_identifier.hex}_originresponse"
     role = aws_iam_role.test_lambda_role.arn
     handler = "index.handler"
 
