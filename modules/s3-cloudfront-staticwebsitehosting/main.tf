@@ -2,13 +2,13 @@ resource "aws_s3_bucket" "gatsby_static_bucket" {
     bucket_prefix = "${var.domain}-"
 
     website {
-        index_document = "${var.index_document}"
-        error_document = "${var.error_document}"
+        index_document = var.index_document
+        error_document = var.error_document
     }
 }
 
 resource "aws_s3_bucket_public_access_block" "gatsby_static_bucket_publicaccess" {
-    bucket = "${aws_s3_bucket.gatsby_static_bucket.id}"
+    bucket = aws_s3_bucket.gatsby_static_bucket.id
 
     block_public_acls = false
     block_public_policy = false
@@ -38,18 +38,18 @@ data "aws_iam_policy_document" "gatsby_static_bucket_policy_document" {
 }
 
 resource "aws_s3_bucket_policy" "gatsby_static_bucket_policy" {
-    bucket = "${aws_s3_bucket.gatsby_static_bucket.id}"
+    bucket = aws_s3_bucket.gatsby_static_bucket.id
 
-    policy = "${data.aws_iam_policy_document.gatsby_static_bucket_policy_document.json}"
+    policy = data.aws_iam_policy_document.gatsby_static_bucket_policy_document.json
 }
 
 locals {
-    https = "${var.acm_certificate_arn != "" || var.iam_certificate_id != ""}"
+    https = var.acm_certificate_arn != "" || var.iam_certificate_id != ""
 }
 
 resource "aws_cloudfront_distribution" "gatsby_static_distribution" {
     enabled = true
-    aliases = ["${var.domain}"]
+    aliases = [var.domain]
 
     http_version = "http2"
     is_ipv6_enabled = true
@@ -62,7 +62,7 @@ resource "aws_cloudfront_distribution" "gatsby_static_distribution" {
 
     origin {
         origin_id = "main"
-        domain_name = "${aws_s3_bucket.gatsby_static_bucket.website_endpoint}"
+        domain_name = aws_s3_bucket.gatsby_static_bucket.website_endpoint
 
         custom_origin_config {
             http_port = 80
@@ -73,19 +73,19 @@ resource "aws_cloudfront_distribution" "gatsby_static_distribution" {
     }
 
     viewer_certificate {
-        acm_certificate_arn = "${var.acm_certificate_arn}"
-        iam_certificate_id = "${var.iam_certificate_id}"
-        minimum_protocol_version = "${var.https_minimum_protocol_version}"
-        ssl_support_method = "${var.https_support_non_sni ? "vip" : "sni-only"}"
+        acm_certificate_arn = var.acm_certificate_arn
+        iam_certificate_id = var.iam_certificate_id
+        minimum_protocol_version = var.https_minimum_protocol_version
+        ssl_support_method = var.https_support_non_sni ? "vip" : "sni-only"
     }
 
     default_cache_behavior {
         target_origin_id = "main"
-        min_ttl = "${var.cache_all_objects ? 31536000 : 0}"
-        default_ttl = "${var.cache_all_objects ? 31536000 : 0}"
+        min_ttl = var.cache_all_objects ? 31536000 : 0
+        default_ttl = var.cache_all_objects ? 31536000 : 0
         max_ttl = 31536000
         compress = true
-        viewer_protocol_policy = "${var.https_redirect ? "redirect-to-https" : "allow-all"}"
+        viewer_protocol_policy = var.https_redirect ? "redirect-to-https" : "allow-all"
         allowed_methods = ["GET", "HEAD", "OPTIONS"]
         cached_methods = ["GET", "HEAD", "OPTIONS"]
         forwarded_values {
