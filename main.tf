@@ -19,20 +19,6 @@ data "aws_route53_zone" "primary_zone" {
     private_zone = false
 }
 
-module "primary_cert" {
-    source = "github.com/azavea/terraform-aws-acm-certificate?ref=4.0.0"
-
-    providers = {
-        aws.acm_account = aws.certificates
-        aws.route53_account = aws
-    }
-
-    domain_name = var.domain
-    subject_alternative_names = []
-    hosted_zone_id = data.aws_route53_zone.primary_zone.id
-    validation_record_ttl = "60"
-}
-
 
 #//////////////////////
 resource "aws_iam_role" "test_lambda_role" {
@@ -132,8 +118,11 @@ resource "aws_lambda_function" "test_originresponse_lambda" {
 module "s3_cf_staticwebsitehosting" {
     source = "./modules/s3-cloudfront-originaccessidentity"
 
+    providers = {
+        aws = aws
+    }
+
     domain = var.domain
-    acm_certificate_arn = module.primary_cert.arn
     cache_all_objects = "true"
 
     cloudfront_lambda_viewerrequest_enabled = true
@@ -142,6 +131,8 @@ module "s3_cf_staticwebsitehosting" {
     cloudfront_lambda_originrequest_qualifiedarn = aws_lambda_function.test_originrequest_lambda.qualified_arn
     cloudfront_lambda_originresponse_enabled = true
     cloudfront_lambda_originresponse_qualifiedarn = aws_lambda_function.test_originresponse_lambda.qualified_arn
+
+    domain_route53_zones = var.domain_route53_zones
 }
 
 resource "aws_route53_record" "main_dns_ipv4" {

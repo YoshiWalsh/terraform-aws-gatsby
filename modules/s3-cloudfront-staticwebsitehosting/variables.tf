@@ -6,13 +6,19 @@ variable "domain" {
 variable "acm_certificate_arn" {
     type = string
     default = ""
-    description = "The ARN of the ACM certificate to use when serving pages via HTTPS. Optional, provide either this or iam_certificate_id if you wish to enable HTTPS."
+    description = "The ARN of the ACM certificate to use when serving pages via HTTPS."
 }
 
 variable "iam_certificate_id" {
     type = string
     default = ""
-    description = "The ID of the IAM certificate to use when serving pages via HTTPS. Optional, provide either this or acm_certificate_arn if you wish to enable HTTPS."
+    description = "The ID of the IAM certificate to use when serving pages via HTTPS."
+}
+
+variable "issue_certificate" {
+    type = bool
+    default = true
+    description = "If set and no existing certificate is passed, a new certificate will be requested using DNS vallidation. Does nothing if acm_certificate_arn or iam_certificate_id are specified."
 }
 
 variable "https_minimum_protocol_version" {
@@ -109,4 +115,10 @@ variable "existing_s3_bucket" {
     type = string
     default = null
     description = "If specified, the module will not create an S3 bucket and will instead just create a CloudFront distribution linking to it. If used in conjunction with use_private_bucket, you are responsible for adding the OAI ARN from the output into your bucket's policy."
+}
+
+variable "domain_route53_zones" {
+    type = map
+    default = {}
+    description = "Used to specify the existing Route53 zones to create each domain within. R53 zone names must include the trailing '.'"
 }

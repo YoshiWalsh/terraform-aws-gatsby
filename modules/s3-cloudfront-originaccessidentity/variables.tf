@@ -15,6 +15,12 @@ variable "iam_certificate_id" {
     description = "The ID of the IAM certificate to use when serving pages via HTTPS. Optional, provide either this or acm_certificate_arn if you wish to enable HTTPS."
 }
 
+variable "issue_certificate" {
+    type = bool
+    default = true
+    description = "If set and no existing certificate is passed, a new certificate will be requested using DNS vallidation. Does nothing if acm_certificate_arn or iam_certificate_id are specified."
+}
+
 variable "https_minimum_protocol_version" {
     type = string
     default = "TLSv1.1_2016" # Amazon's recommendation as of 2019-03-21
@@ -97,4 +103,10 @@ variable "cloudfront_lambda_viewerresponse_qualifiedarn" {
     type = string
     default = ""
     description = "A list of qualified ARNs for published Lambda functions that should be registered with the CloudFront distribution's viewer response event."
+}
+
+variable "domain_route53_zones" {
+    type = map
+    default = {}
+    description = "Used to specify the existing Route53 zones to create each domain within. R53 zone names must include the trailing '.'"
 }

@@ -1,3 +1,13 @@
+terraform {
+    required_providers {
+        aws = {
+            source  = "hashicorp/aws"
+            version = ">= 5.0.0"
+            configuration_aliases = [ aws, aws.certificates ]
+        }
+    }
+}
+
 resource "aws_s3_bucket" "static_bucket" {
     count = var.existing_s3_bucket == null ? 1 : 0
 
@@ -68,8 +78,32 @@ resource "aws_s3_bucket_policy" "static_bucket_policy" {
     policy = data.aws_iam_policy_document.static_bucket_policy_document[0].json
 }
 
+
+data "aws_route53_zone" "primary_zone" {
+    count = (var.issue_certificate && try(coalesce(var.acm_certificate_arn, var.iam_certificate_id), null) == null) ? 1 : 0
+
+    name = lookup(var.domain_route53_zones, var.domain, var.domain)
+    private_zone = false
+}
+
+module "primary_cert" {
+    count = (var.issue_certificate && try(coalesce(var.acm_certificate_arn, var.iam_certificate_id), null) == null) ? 1 : 0
+
+    source = "github.com/azavea/terraform-aws-acm-certificate?ref=4.0.0"
+
+    providers = {
+        aws.acm_account = aws.certificates
+        aws.route53_account = aws
+    }
+
+    domain_name = var.domain
+    subject_alternative_names = []
+    hosted_zone_id = data.aws_route53_zone.primary_zone[0].id
+    validation_record_ttl = "60"
+}
+
 locals {
-    https = var.acm_certificate_arn != "" || var.iam_certificate_id != ""
+    https = var.acm_certificate_arn != "" || var.iam_certificate_id != "" || var.issue_certificate
 }
 
 resource "aws_iam_role" "lambda_role" {
@@ -217,7 +251,7 @@ resource "aws_cloudfront_distribution" "static_distribution" {
     }
 
     viewer_certificate {
-        acm_certificate_arn = var.acm_certificate_arn
+        acm_certificate_arn = try(module.primary_cert[0].arn, var.acm_certificate_arn, null)
         iam_certificate_id = var.iam_certificate_id
         minimum_protocol_version = var.https_minimum_protocol_version
         ssl_support_method = var.https_support_non_sni ? "vip" : "sni-only"
