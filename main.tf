@@ -16,8 +16,8 @@ module "primary_cert" {
     source = "github.com/azavea/terraform-aws-acm-certificate?ref=1.0.0"
 
     providers = {
-        aws.acm_account = "aws.certificates"
-        aws.route53_account = "aws"
+        aws.acm_account = aws.certificates
+        aws.route53_account = aws
     }
 
     domain_name = var.domain

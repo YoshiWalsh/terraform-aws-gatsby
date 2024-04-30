@@ -1,5 +1,5 @@
 variable "domain" {
-    type = "string"
+    type = string
     description = "The domain name to host the website at."
 }
 
@@ -9,7 +9,7 @@ variable "domain_route53_zones" {
 }
 
 variable "region" {
-    type = "string"
+    type = string
     description = "The AWS region to create resources in."
     default = "us-east-1"
 }
