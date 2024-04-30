@@ -111,22 +111,22 @@ resource "aws_lambda_function" "test_originresponse_lambda" {
 
 
 module "s3_cf_staticwebsitehosting" {
-    source = "./modules/s3-cloudfront-originaccessidentity"
+    source = "./modules/simple-static-site"
 
     providers = {
         aws = aws
+        aws.certificates = aws.certificates
     }
 
     domain = var.domain
-    cache_all_objects = "true"
 
-    cloudfront_lambda_viewerrequest_enabled = true
     cloudfront_lambda_viewerrequest_qualifiedarn = aws_lambda_function.test_viewerrequest_lambda.qualified_arn
-    cloudfront_lambda_originrequest_enabled = true
     cloudfront_lambda_originrequest_qualifiedarn = aws_lambda_function.test_originrequest_lambda.qualified_arn
-    cloudfront_lambda_originresponse_enabled = true
     cloudfront_lambda_originresponse_qualifiedarn = aws_lambda_function.test_originresponse_lambda.qualified_arn
 
     domain_route53_zones = var.domain_route53_zones
-    create_dns_records = true
+
+    redirect_sources = var.redirect_sources
+
+    use_private_bucket = true
 }

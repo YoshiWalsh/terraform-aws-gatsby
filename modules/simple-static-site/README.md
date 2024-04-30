@@ -1,0 +1,1 @@
+This is an opinionated module for spinning up a static site on S3 with a few modcons.

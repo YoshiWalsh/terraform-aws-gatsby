@@ -13,3 +13,9 @@ variable "region" {
     description = "The AWS region to create resources in."
     default = "us-east-1"
 }
+
+variable "redirect_sources" {
+    type = list
+    default = []
+    description = "A list of additional domains which will be configured to redirect to this domain."
+}
