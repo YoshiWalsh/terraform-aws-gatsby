@@ -1,11 +1,19 @@
 resource "aws_s3_bucket" "static_bucket" {
+    count = var.existing_s3_bucket == null ? 1 : 0
+
     bucket_prefix = "${var.domain}-"
 }
 
-resource "aws_s3_bucket_website_configuration" "static_website_configuration" {
-    count = var.use_private_bucket ? 0 : 1
+data "aws_s3_bucket" "existing_bucket" {
+    count = var.existing_s3_bucket != null ? 1 : 0
 
-    bucket = aws_s3_bucket.static_bucket
+    bucket = var.existing_s3_bucket
+}
+
+resource "aws_s3_bucket_website_configuration" "static_website_configuration" {
+    count = (var.use_private_bucket || var.existing_s3_bucket != null) ? 0 : 1
+
+    bucket = aws_s3_bucket.static_bucket[0]
     index_document {
         suffix = var.index_document
     }
@@ -15,7 +23,9 @@ resource "aws_s3_bucket_website_configuration" "static_website_configuration" {
 }
 
 resource "aws_s3_bucket_public_access_block" "static_bucket_publicaccess" {
-    bucket = aws_s3_bucket.static_bucket.id
+    count = var.existing_s3_bucket == null ? 1 : 0
+
+    bucket = aws_s3_bucket.static_bucket[0].id
 
     block_public_acls = var.use_private_bucket
     block_public_policy = var.use_private_bucket
@@ -24,19 +34,21 @@ resource "aws_s3_bucket_public_access_block" "static_bucket_publicaccess" {
 }
 
 resource "aws_cloudfront_origin_access_identity" "oai" {
-    count = var.use_private_bucket ? 1 : 0
+    count = (var.use_private_bucket && var.existing_s3_bucket == null) ? 1 : 0
     
     comment = var.domain
 }
 
 data "aws_iam_policy_document" "static_bucket_policy_document" {
+    count = var.existing_s3_bucket == null ? 1 : 0
+
     statement {
         actions = [
             "s3:GetObject"
         ]
 
         resources = [
-            "${aws_s3_bucket.static_bucket.arn}/*"
+            "${aws_s3_bucket.static_bucket[0].arn}/*"
         ]
 
         principals {
@@ -49,9 +61,11 @@ data "aws_iam_policy_document" "static_bucket_policy_document" {
 }
 
 resource "aws_s3_bucket_policy" "static_bucket_policy" {
-    bucket = aws_s3_bucket.static_bucket.id
+    count = var.existing_s3_bucket == null ? 1 : 0
 
-    policy = data.aws_iam_policy_document.static_bucket_policy_document.json
+    bucket = aws_s3_bucket.static_bucket[0].id
+
+    policy = data.aws_iam_policy_document.static_bucket_policy_document[0].json
 }
 
 locals {
@@ -168,7 +182,19 @@ resource "aws_cloudfront_distribution" "static_distribution" {
 
     origin {
         origin_id = "main"
-        domain_name = var.use_private_bucket ? aws_s3_bucket.static_bucket.bucket_regional_domain_name : aws_s3_bucket_website_configuration.static_website_configuration[0].website_endpoint
+        domain_name = (
+            var.existing_s3_bucket == null ?
+            (
+                var.use_private_bucket ?
+                aws_s3_bucket.static_bucket[0].bucket_regional_domain_name :
+                aws_s3_bucket_website_configuration.static_website_configuration[0].website_endpoint
+            ) :
+            (
+                var.use_private_bucket ?
+                data.aws_s3_bucket.existing_bucket[0].bucket_regional_domain_name :
+                data.aws_s3_bucket.existing_bucket[0].website_endpoint
+            )
+        )
 
         dynamic custom_origin_config {
             for_each = var.use_private_bucket ? [] : [true]

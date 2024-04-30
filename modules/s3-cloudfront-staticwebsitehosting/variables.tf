@@ -104,3 +104,9 @@ variable "use_private_bucket" {
     default = false
     description = "Uses an Origin Access Identity and Lambda@Edge in order to replicate S3 Static Website Hosting functionality but with a private bucket."
 }
+
+variable "existing_s3_bucket" {
+    type = string
+    default = null
+    description = "If specified, the module will not create an S3 bucket and will instead just create a CloudFront distribution linking to it. If used in conjunction with use_private_bucket, you are responsible for adding the OAI ARN from the output into your bucket's policy."
+}
