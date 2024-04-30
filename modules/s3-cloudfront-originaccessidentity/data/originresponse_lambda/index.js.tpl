@@ -2,7 +2,10 @@
 
 var URL = require('url').URL;
 var path = require('path');
-var AWS = require('aws-sdk');
+var AWSLambda = require('@aws-sdk/client-lambda');
+
+const LambdaClient = AWSLambda.LambdaClient;
+const InvokeCommand = AWSLambda.InvokeCommand;
 
 var directoryIndexKey = "${index_document}";
 var passthroughFunctionQualifiedArn = "${passthrough}";
@@ -30,27 +33,26 @@ exports.handler = (event, context, callback) => {
     }
 
     if (passthroughFunctionQualifiedArn) {
-        var lambda = new AWS.Lambda({
+        var lambda = new LambdaClient({
             region: 'us-east-1'
         });
 
         var qualifiedArnSplitter = passthroughFunctionQualifiedArn.lastIndexOf(":");
         var unqualifiedArn = passthroughFunctionQualifiedArn.slice(0, qualifiedArnSplitter);
         var qualifier = passthroughFunctionQualifiedArn.slice(qualifiedArnSplitter + 1);
-        lambda.invoke({
+        lambda.send(new InvokeCommand({
             InvocationType: "RequestResponse",
             FunctionName: unqualifiedArn,
             Qualifier: qualifier,
             Payload: JSON.stringify(event),
-        }, function(err, data) {
-            if(err) {
-                callback(err, null);
-                return;
-            }
+        })).then(data => {
             if(data.FunctionError) {
                 callback("User-defined lambda function returned an error: " + data.Payload, null);
+                return;
             }
-            callback(null, JSON.parse(data.Payload));
+            callback(null, JSON.parse(Buffer.from(data.Payload).toString()));
+        }, err => {
+            callback(err, null);
         });
     } else {
         callback(null, response);
