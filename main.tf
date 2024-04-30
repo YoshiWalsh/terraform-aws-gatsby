@@ -59,7 +59,7 @@ resource "aws_lambda_function" "test_viewerrequest_lambda" {
     handler = "index.handler"
 
     source_code_hash = data.archive_file.test_viewerrequest_lambda_archive.output_base64sha256
-    runtime = "nodejs8.10"
+    runtime = "nodejs20.x"
     publish = true
 
     lifecycle {
@@ -84,7 +84,7 @@ resource "aws_lambda_function" "test_originrequest_lambda" {
     handler = "index.handler"
 
     source_code_hash = data.archive_file.test_originrequest_lambda_archive.output_base64sha256
-    runtime = "nodejs8.10"
+    runtime = "nodejs20.x"
     publish = true
 
     lifecycle {
@@ -109,7 +109,7 @@ resource "aws_lambda_function" "test_originresponse_lambda" {
     handler = "index.handler"
 
     source_code_hash = data.archive_file.test_originresponse_lambda_archive.output_base64sha256
-    runtime = "nodejs8.10"
+    runtime = "nodejs20.x"
     publish = true
 
     lifecycle {
