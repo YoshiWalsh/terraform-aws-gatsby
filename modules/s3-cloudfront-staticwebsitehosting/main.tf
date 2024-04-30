@@ -346,3 +346,31 @@ resource "aws_cloudfront_distribution" "static_distribution" {
         response_page_path = "/${var.error_document}"
     }
 }
+
+resource "aws_route53_record" "main_dns_ipv4" {
+    count = var.create_dns_records ? 1 : 0
+
+    zone_id = data.aws_route53_zone.primary_zone[0].id
+    name = var.domain
+    type = "A"
+    
+    alias {
+        name = aws_cloudfront_distribution.static_distribution.domain_name
+        zone_id = aws_cloudfront_distribution.static_distribution.hosted_zone_id
+        evaluate_target_health = false
+    }
+}
+
+resource "aws_route53_record" "main_dns_ipv6" {
+    count = var.create_dns_records ? 1 : 0
+
+    zone_id = data.aws_route53_zone.primary_zone[0].id
+    name = var.domain
+    type = "AAAA"
+    
+    alias {
+        name = aws_cloudfront_distribution.static_distribution.domain_name
+        zone_id = aws_cloudfront_distribution.static_distribution.hosted_zone_id
+        evaluate_target_health = false
+    }
+}

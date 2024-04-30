@@ -18,7 +18,7 @@ variable "iam_certificate_id" {
 variable "issue_certificate" {
     type = bool
     default = true
-    description = "If set and no existing certificate is passed, a new certificate will be requested using DNS vallidation. Does nothing if acm_certificate_arn or iam_certificate_id are specified."
+    description = "If set and no existing certificate is passed, a new certificate will be requested using DNS vallidation. Requires Route53 for validation. Does nothing if acm_certificate_arn or iam_certificate_id are specified."
 }
 
 variable "https_minimum_protocol_version" {
@@ -121,4 +121,10 @@ variable "domain_route53_zones" {
     type = map
     default = {}
     description = "Used to specify the existing Route53 zones to create each domain within. R53 zone names must include the trailing '.'"
+}
+
+variable "create_dns_records" {
+    type = bool
+    default = false
+    description = "If enabled, DNS records will be created in Route53 automatically."
 }

@@ -110,3 +110,9 @@ variable "domain_route53_zones" {
     default = {}
     description = "Used to specify the existing Route53 zones to create each domain within. R53 zone names must include the trailing '.'"
 }
+
+variable "create_dns_records" {
+    type = bool
+    default = false
+    description = "If enabled, DNS records will be created in Route53 automatically."
+}

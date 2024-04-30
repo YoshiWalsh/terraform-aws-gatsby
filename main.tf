@@ -14,11 +14,6 @@ resource "random_id" "environment_identifier" {
     byte_length = 8
 }
 
-data "aws_route53_zone" "primary_zone" {
-    name = lookup(var.domain_route53_zones, var.domain, var.domain)
-    private_zone = false
-}
-
 
 #//////////////////////
 resource "aws_iam_role" "test_lambda_role" {
@@ -133,28 +128,5 @@ module "s3_cf_staticwebsitehosting" {
     cloudfront_lambda_originresponse_qualifiedarn = aws_lambda_function.test_originresponse_lambda.qualified_arn
 
     domain_route53_zones = var.domain_route53_zones
-}
-
-resource "aws_route53_record" "main_dns_ipv4" {
-    zone_id = data.aws_route53_zone.primary_zone.id
-    name = var.domain
-    type = "A"
-    
-    alias {
-        name = module.s3_cf_staticwebsitehosting.cf_distribution_domain
-        zone_id = module.s3_cf_staticwebsitehosting.cf_distribution_zone_id
-        evaluate_target_health = false
-    }
-}
-
-resource "aws_route53_record" "main_dns_ipv6" {
-    zone_id = data.aws_route53_zone.primary_zone.id
-    name = var.domain
-    type = "AAAA"
-    
-    alias {
-        name = module.s3_cf_staticwebsitehosting.cf_distribution_domain
-        zone_id = module.s3_cf_staticwebsitehosting.cf_distribution_zone_id
-        evaluate_target_health = false
-    }
+    create_dns_records = true
 }

@@ -33,6 +33,7 @@ module "staticwebsite" {
     cloudfront_lambda_viewerresponse_qualifiedarn = var.cloudfront_lambda_viewerresponse_qualifiedarn
     issue_certificate = var.issue_certificate
     domain_route53_zones =  var.domain_route53_zones
+    create_dns_records = var.create_dns_records
 
     use_private_bucket = true
 }
