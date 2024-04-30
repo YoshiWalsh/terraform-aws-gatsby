@@ -13,7 +13,7 @@ data "aws_route53_zone" "primary_zone" {
 }
 
 module "primary_cert" {
-    source = "github.com/azavea/terraform-aws-acm-certificate?ref=1.0.0"
+    source = "github.com/azavea/terraform-aws-acm-certificate?ref=4.0.0"
 
     providers = {
         aws.acm_account = aws.certificates
