@@ -1,9 +1,14 @@
 resource "aws_s3_bucket" "gatsby_static_bucket" {
     bucket_prefix = "${var.domain}-"
+}
 
-    website {
-        index_document = var.index_document
-        error_document = var.error_document
+resource "aws_s3_bucket_website_configuration" "gatsby_static_website_configuration" {
+    bucket = aws_s3_bucket.gatsby_static_bucket
+    index_document {
+        suffix = var.index_document
+    }
+    error_document {
+        key = var.error_document
     }
 }
 
@@ -26,12 +31,10 @@ data "aws_iam_policy_document" "gatsby_static_bucket_policy_document" {
             "${aws_s3_bucket.gatsby_static_bucket.arn}/*"
         ]
 
-        principals = [
-            {
-                type = "*"
-                identifiers = ["*"]
-            }
-        ]
+        principals {
+            type = "*"
+            identifiers = ["*"]
+        }
 
         effect = "Allow"
     }    

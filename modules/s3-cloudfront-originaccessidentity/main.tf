@@ -1,10 +1,5 @@
 resource "aws_s3_bucket" "gatsby_static_bucket" {
     bucket_prefix = "${var.domain}-"
-
-    website {
-        index_document = "index.html"
-        error_document = "404.html"
-    }
 }
 
 resource "aws_s3_bucket_public_access_block" "gatsby_static_bucket_publicaccess" {
@@ -30,12 +25,10 @@ data "aws_iam_policy_document" "gatsby_static_bucket_policy_document" {
             "${aws_s3_bucket.gatsby_static_bucket.arn}/*"
         ]
 
-        principals = [
-            {
-                type = "AWS"
-                identifiers = [aws_cloudfront_origin_access_identity.gatsby_oai.iam_arn]
-            }
-        ]
+        principals {
+            type = "AWS"
+            identifiers = [aws_cloudfront_origin_access_identity.gatsby_oai.iam_arn]
+        }
 
         effect = "Allow"
     }    
