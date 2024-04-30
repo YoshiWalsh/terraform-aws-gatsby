@@ -103,7 +103,7 @@ resource "aws_cloudfront_distribution" "distribution" {
 
         content {
             error_code = 403
-            response_type = var.custom_response_403_code
+            response_code = var.custom_response_403_code
             response_page_path = var.custom_response_403_page_path
         }
     }
@@ -113,7 +113,7 @@ resource "aws_cloudfront_distribution" "distribution" {
 
         content {
             error_code = 404
-            response_type = var.custom_response_404_code
+            response_code = var.custom_response_404_code
             response_page_path = var.custom_response_404_page_path
         }
     }

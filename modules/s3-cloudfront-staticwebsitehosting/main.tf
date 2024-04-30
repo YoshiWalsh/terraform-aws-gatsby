@@ -282,7 +282,7 @@ resource "aws_cloudfront_distribution" "static_distribution" {
 
     custom_error_response {
         error_code = 403
-        response_type = 404
+        response_code = 404
         response_page_path = "/${var.error_document}"
     }
 }
