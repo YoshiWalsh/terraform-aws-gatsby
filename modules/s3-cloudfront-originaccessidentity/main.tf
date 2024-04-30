@@ -1,9 +1,9 @@
-resource "aws_s3_bucket" "gatsby_static_bucket" {
+resource "aws_s3_bucket" "static_bucket" {
     bucket_prefix = "${var.domain}-"
 }
 
-resource "aws_s3_bucket_public_access_block" "gatsby_static_bucket_publicaccess" {
-    bucket = aws_s3_bucket.gatsby_static_bucket.id
+resource "aws_s3_bucket_public_access_block" "static_bucket_publicaccess" {
+    bucket = aws_s3_bucket.static_bucket.id
 
     block_public_acls = true
     block_public_policy = true
@@ -11,54 +11,54 @@ resource "aws_s3_bucket_public_access_block" "gatsby_static_bucket_publicaccess"
     restrict_public_buckets = true
 }
 
-resource "aws_cloudfront_origin_access_identity" "gatsby_oai" {
+resource "aws_cloudfront_origin_access_identity" "oai" {
     comment = var.domain
 }
 
-data "aws_iam_policy_document" "gatsby_static_bucket_policy_document" {
+data "aws_iam_policy_document" "static_bucket_policy_document" {
     statement {
         actions = [
             "s3:GetObject"
         ]
 
         resources = [
-            "${aws_s3_bucket.gatsby_static_bucket.arn}/*"
+            "${aws_s3_bucket.static_bucket.arn}/*"
         ]
 
         principals {
             type = "AWS"
-            identifiers = [aws_cloudfront_origin_access_identity.gatsby_oai.iam_arn]
+            identifiers = [aws_cloudfront_origin_access_identity.oai.iam_arn]
         }
 
         effect = "Allow"
     }    
 }
 
-resource "aws_s3_bucket_policy" "gatsby_static_bucket_policy" {
-    bucket = aws_s3_bucket.gatsby_static_bucket.id
+resource "aws_s3_bucket_policy" "static_bucket_policy" {
+    bucket = aws_s3_bucket.static_bucket.id
 
-    policy = data.aws_iam_policy_document.gatsby_static_bucket_policy_document.json
+    policy = data.aws_iam_policy_document.static_bucket_policy_document.json
 }
 
 locals {
     https = var.acm_certificate_arn != "" || var.iam_certificate_id != ""
 }
 
-resource "aws_iam_role" "gatsby_lambda_role" {
+resource "aws_iam_role" "lambda_role" {
   name = "${replace("${var.domain}", ".", "-")}_lambda"
 
 
-  assume_role_policy = file("${path.module}/data/gatsby_lambda_role_assumepolicy.json")
+  assume_role_policy = file("${path.module}/data/lambda_role_assumepolicy.json")
 }
 
-resource "aws_iam_role_policy" "gatsby_lambda_role_policy" {
+resource "aws_iam_role_policy" "lambda_role_policy" {
   name = "${replace("${var.domain}", ".", "-")}_lambda"
-  role = aws_iam_role.gatsby_lambda_role.id
+  role = aws_iam_role.lambda_role.id
 
-  policy = file("${path.module}/data/gatsby_lambda_role_policy.json")
+  policy = file("${path.module}/data/lambda_role_policy.json")
 }
 
-data "template_file" "gatsby_originrequest_lambda_template" {
+data "template_file" "originrequest_lambda_template" {
     template = file("${path.module}/data/originrequest_lambda/index.js.tpl")
     vars = {
         index_document = var.index_document
@@ -66,23 +66,23 @@ data "template_file" "gatsby_originrequest_lambda_template" {
     }
 }
 
-data "archive_file" "gatsby_originrequest_lambda_archive" {
+data "archive_file" "originrequest_lambda_archive" {
     type = "zip"
     output_path = "${path.module}/artifacts/originrequest_lambda.zip"
 
     source {
         filename = "index.js"
-        content = data.template_file.gatsby_originrequest_lambda_template.rendered
+        content = data.template_file.originrequest_lambda_template.rendered
     }
 }
 
-resource "aws_lambda_function" "gatsby_originrequest_lambda" {
+resource "aws_lambda_function" "originrequest_lambda" {
     filename = "${path.module}/artifacts/originrequest_lambda.zip"
     function_name = "${replace("${var.domain}", ".", "-")}_originrequest"
-    role = aws_iam_role.gatsby_lambda_role.arn
+    role = aws_iam_role.lambda_role.arn
     handler = "index.handler"
 
-    source_code_hash = data.archive_file.gatsby_originrequest_lambda_archive.output_base64sha256
+    source_code_hash = data.archive_file.originrequest_lambda_archive.output_base64sha256
     runtime = "nodejs8.10"
     publish = true
 
@@ -91,7 +91,7 @@ resource "aws_lambda_function" "gatsby_originrequest_lambda" {
     }
 }
 
-data "template_file" "gatsby_originresponse_lambda_template" {
+data "template_file" "originresponse_lambda_template" {
     template = file("${path.module}/data/originresponse_lambda/index.js.tpl")
     vars = {
         index_document = var.index_document
@@ -99,23 +99,23 @@ data "template_file" "gatsby_originresponse_lambda_template" {
     }
 }
 
-data "archive_file" "gatsby_originresponse_lambda_archive" {
+data "archive_file" "originresponse_lambda_archive" {
     type = "zip"
     output_path = "${path.module}/artifacts/originresponse_lambda.zip"
 
     source {
         filename = "index.js"
-        content = data.template_file.gatsby_originresponse_lambda_template.rendered
+        content = data.template_file.originresponse_lambda_template.rendered
     }
 }
 
-resource "aws_lambda_function" "gatsby_originresponse_lambda" {
+resource "aws_lambda_function" "originresponse_lambda" {
     filename = "${path.module}/artifacts/originresponse_lambda.zip"
     function_name = "${replace("${var.domain}", ".", "-")}_originresponse"
-    role = aws_iam_role.gatsby_lambda_role.arn
+    role = aws_iam_role.lambda_role.arn
     handler = "index.handler"
 
-    source_code_hash = data.archive_file.gatsby_originresponse_lambda_archive.output_base64sha256
+    source_code_hash = data.archive_file.originresponse_lambda_archive.output_base64sha256
     runtime = "nodejs8.10"
     publish = true
 
@@ -124,7 +124,7 @@ resource "aws_lambda_function" "gatsby_originresponse_lambda" {
     }
 }
 
-resource "aws_cloudfront_distribution" "gatsby_static_distribution" {
+resource "aws_cloudfront_distribution" "static_distribution" {
     enabled = true
     aliases = [var.domain]
 
@@ -139,10 +139,10 @@ resource "aws_cloudfront_distribution" "gatsby_static_distribution" {
 
     origin {
         origin_id = "main"
-        domain_name = aws_s3_bucket.gatsby_static_bucket.bucket_regional_domain_name
+        domain_name = aws_s3_bucket.static_bucket.bucket_regional_domain_name
 
         s3_origin_config {
-            origin_access_identity = aws_cloudfront_origin_access_identity.gatsby_oai.cloudfront_access_identity_path
+            origin_access_identity = aws_cloudfront_origin_access_identity.oai.cloudfront_access_identity_path
         }
     }
 
@@ -181,13 +181,13 @@ resource "aws_cloudfront_distribution" "gatsby_static_distribution" {
 
         lambda_function_association {
             event_type = "origin-request"
-            lambda_arn = aws_lambda_function.gatsby_originrequest_lambda.qualified_arn
+            lambda_arn = aws_lambda_function.originrequest_lambda.qualified_arn
             include_body = false
         }
 
         lambda_function_association {
             event_type = "origin-response"
-            lambda_arn = aws_lambda_function.gatsby_originresponse_lambda.qualified_arn
+            lambda_arn = aws_lambda_function.originresponse_lambda.qualified_arn
             include_body = false
         }
 

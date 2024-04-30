@@ -1,9 +1,9 @@
-resource "aws_s3_bucket" "gatsby_static_bucket" {
+resource "aws_s3_bucket" "static_bucket" {
     bucket_prefix = "${var.domain}-"
 }
 
-resource "aws_s3_bucket_website_configuration" "gatsby_static_website_configuration" {
-    bucket = aws_s3_bucket.gatsby_static_bucket
+resource "aws_s3_bucket_website_configuration" "static_website_configuration" {
+    bucket = aws_s3_bucket.static_bucket
     index_document {
         suffix = var.index_document
     }
@@ -12,8 +12,8 @@ resource "aws_s3_bucket_website_configuration" "gatsby_static_website_configurat
     }
 }
 
-resource "aws_s3_bucket_public_access_block" "gatsby_static_bucket_publicaccess" {
-    bucket = aws_s3_bucket.gatsby_static_bucket.id
+resource "aws_s3_bucket_public_access_block" "static_bucket_publicaccess" {
+    bucket = aws_s3_bucket.static_bucket.id
 
     block_public_acls = false
     block_public_policy = false
@@ -21,14 +21,14 @@ resource "aws_s3_bucket_public_access_block" "gatsby_static_bucket_publicaccess"
     restrict_public_buckets = false
 }
 
-data "aws_iam_policy_document" "gatsby_static_bucket_policy_document" {
+data "aws_iam_policy_document" "static_bucket_policy_document" {
     statement {
         actions = [
             "s3:GetObject"
         ]
 
         resources = [
-            "${aws_s3_bucket.gatsby_static_bucket.arn}/*"
+            "${aws_s3_bucket.static_bucket.arn}/*"
         ]
 
         principals {
@@ -40,17 +40,17 @@ data "aws_iam_policy_document" "gatsby_static_bucket_policy_document" {
     }    
 }
 
-resource "aws_s3_bucket_policy" "gatsby_static_bucket_policy" {
-    bucket = aws_s3_bucket.gatsby_static_bucket.id
+resource "aws_s3_bucket_policy" "static_bucket_policy" {
+    bucket = aws_s3_bucket.static_bucket.id
 
-    policy = data.aws_iam_policy_document.gatsby_static_bucket_policy_document.json
+    policy = data.aws_iam_policy_document.static_bucket_policy_document.json
 }
 
 locals {
     https = var.acm_certificate_arn != "" || var.iam_certificate_id != ""
 }
 
-resource "aws_cloudfront_distribution" "gatsby_static_distribution" {
+resource "aws_cloudfront_distribution" "static_distribution" {
     enabled = true
     aliases = [var.domain]
 
@@ -65,7 +65,7 @@ resource "aws_cloudfront_distribution" "gatsby_static_distribution" {
 
     origin {
         origin_id = "main"
-        domain_name = aws_s3_bucket.gatsby_static_bucket.website_endpoint
+        domain_name = aws_s3_bucket.static_bucket.website_endpoint
 
         custom_origin_config {
             http_port = 80

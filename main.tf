@@ -32,14 +32,14 @@ resource "aws_iam_role" "test_lambda_role" {
   name = "${replace("${var.domain}", ".", "-")}_testlambda"
 
 
-  assume_role_policy = file("./modules/s3-cloudfront-originaccessidentity/data/gatsby_lambda_role_assumepolicy.json")
+  assume_role_policy = file("./modules/s3-cloudfront-originaccessidentity/data/lambda_role_assumepolicy.json")
 }
 
 resource "aws_iam_role_policy" "test_lambda_role_policy" {
   name = "${replace("${var.domain}", ".", "-")}_testlambda"
   role = aws_iam_role.test_lambda_role.id
 
-  policy = file("./modules/s3-cloudfront-originaccessidentity/data/gatsby_lambda_role_policy.json")
+  policy = file("./modules/s3-cloudfront-originaccessidentity/data/lambda_role_policy.json")
 }
 
 data "archive_file" "test_viewerrequest_lambda_archive" {
