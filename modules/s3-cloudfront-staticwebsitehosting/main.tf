@@ -128,10 +128,6 @@ resource "aws_cloudfront_distribution" "gatsby_static_distribution" {
         }
     }
 
-    
-    forward_cookies = "none"
-    forward_query = false
-
     custom_error_response {
         error_code = 403
         response_type = 404
