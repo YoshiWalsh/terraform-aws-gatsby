@@ -98,33 +98,41 @@ resource "aws_cloudfront_distribution" "gatsby_static_distribution" {
         dynamic lambda_function_association {
             for_each = var.cloudfront_lambda_viewerrequest_enabled ? [true] : []
 
-            event_type = "viewer-request"
-            lambda_arn = var.cloudfront_lambda_viewerrequest_qualifiedarn
-            include_body = false
+            content {
+                event_type = "viewer-request"
+                lambda_arn = var.cloudfront_lambda_viewerrequest_qualifiedarn
+                include_body = false
+            }
         }
 
         dynamic lambda_function_association {
             for_each = var.cloudfront_lambda_originrequest_enabled
 
-            event_type = "origin-request"
-            lambda_arn = var.cloudfront_lambda_originrequest_qualifiedarn
-            include_body = false
+            content {
+                event_type = "origin-request"
+                lambda_arn = var.cloudfront_lambda_originrequest_qualifiedarn
+                include_body = false
+            }
         }
 
         dynamic lambda_function_association {
             for_each = var.cloudfront_lambda_originresponse_enabled
 
-            event_type = "origin-response"
-            lambda_arn = var.cloudfront_lambda_originresponse_qualifiedarn
-            include_body = false
+            content {
+                event_type = "origin-response"
+                lambda_arn = var.cloudfront_lambda_originresponse_qualifiedarn
+                include_body = false
+            }
         }
 
         dynamic lambda_function_association {
             for_each = var.cloudfront_lambda_viewerresponse_enabled ? [true] : []
 
-            event_type = "viewer-response"
-            lambda_arn = var.cloudfront_lambda_viewerresponse_qualifiedarn
-            include_body = false
+            content {
+                event_type = "viewer-response"
+                lambda_arn = var.cloudfront_lambda_viewerresponse_qualifiedarn
+                include_body = false
+            }
         }
     }
 
