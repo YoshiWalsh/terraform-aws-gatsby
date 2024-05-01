@@ -1,4 +1,4 @@
-domain = "www.example.com"
+canonical_domain = "www.example.com"
 domain_route53_zones = [
     "example.com."
 ]

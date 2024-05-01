@@ -1,4 +1,4 @@
-variable "domain" {
+variable "canonical_domain" {
     type = string
     description = "The domain name to host the website at."
 }

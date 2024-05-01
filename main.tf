@@ -14,17 +14,23 @@ resource "random_id" "environment_identifier" {
     byte_length = 8
 }
 
+locals {
+    is_www = startswith(var.canonical_domain, "www.")
+    unprefixed_domain = local.is_www ? substr(var.canonical_domain, 4, length(var.canonical_domain) - 4) : var.canonical_domain
+    inverse_www_domain = "${local.is_www ? "" : "www."}${local.unprefixed_domain}"
+}
+
 
 #//////////////////////
 resource "aws_iam_role" "test_lambda_role" {
-  name = "${replace("${var.domain}", ".", "-")}_testlambda"
+  name = "${replace("${var.canonical_domain}", ".", "-")}_testlambda"
 
 
   assume_role_policy = file("./modules/s3-cloudfront-staticwebsitehosting/data/lambda_role_assumepolicy.json")
 }
 
 resource "aws_iam_role_policy" "test_lambda_role_policy" {
-  name = "${replace("${var.domain}", ".", "-")}_testlambda"
+  name = "${replace("${var.canonical_domain}", ".", "-")}_testlambda"
   role = aws_iam_role.test_lambda_role.id
 
   policy = file("./modules/s3-cloudfront-staticwebsitehosting/data/lambda_role_policy.json")
@@ -93,14 +99,17 @@ module "s3_cf_staticwebsitehosting" {
         aws.certificates = aws.certificates
     }
 
-    domain = var.domain
+    domain = var.canonical_domain
 
     cloudfront_lambda_viewerrequest_qualifiedarn = aws_lambda_function.test_viewerrequest_lambda.qualified_arn
     cloudfront_lambda_originrequest_qualifiedarn = aws_lambda_function.test_originrequest_lambda.qualified_arn
 
     domain_route53_zones = var.domain_route53_zones
 
-    redirect_sources = var.redirect_sources
+    redirect_sources = concat(
+        [local.inverse_www_domain],
+        var.redirect_sources
+    )
 
     use_private_bucket = true
 }
