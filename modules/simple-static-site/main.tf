@@ -8,6 +8,13 @@ terraform {
     }
 }
 
+resource "random_id" "environment_identifier" {
+    keepers = {
+    }
+
+    byte_length = 8
+}
+
 module "staticwebsite" {
     source = "../s3-cloudfront-staticwebsitehosting"
 
@@ -33,6 +40,7 @@ module "staticwebsite" {
     create_dns_records = true
 
     use_private_bucket = var.use_private_bucket
+    preserve_query_string_on_redirect = true
 }
 
 resource "aws_s3_bucket" "redirect_bucket" {
@@ -81,4 +89,6 @@ module "redirect" {
     domain_route53_zones =  var.domain_route53_zones
     create_dns_records = true
     use_private_bucket = false
+    pass_query_string = true
+    preserve_query_string_on_redirect = false # Unnecessary because S3 Static Website Hosting redirect buckets do this automatically
 }

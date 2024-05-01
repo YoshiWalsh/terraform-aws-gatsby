@@ -3,34 +3,54 @@
 var URL = require('url').URL;
 var path = require('path');
 var AWSLambda = require('@aws-sdk/client-lambda');
+const { Console } = require('console');
 
 const LambdaClient = AWSLambda.LambdaClient;
 const InvokeCommand = AWSLambda.InvokeCommand;
 
 var directoryIndexKey = "${index_document}";
+var preserveRedirectQuery = ${preserveRedirectQuery};
+var emulateStaticWebsiteHosting = ${emulateStaticWebsiteHosting};
 var passthroughFunctionQualifiedArn = "${passthrough}";
 
 exports.handler = (event, context, callback) => {
     var cf = event.Records[0].cf;
-    var uri = cf.request.uri;
+    var request = cf.request;
     var response = cf.response;
-    console.log("Processing response for URI: " + uri);
-    console.log("Original response code: " + response.status);
+    var uri = request.uri;
+    console.log("Settings", JSON.stringify({
+        preserveRedirectQuery,
+        emulateStaticWebsiteHosting,
+        directoryIndexKey,
+        passthroughFunctionQualifiedArn,
+    }));
+    console.log("Request", JSON.stringify(request));
+    console.log("Initial response", JSON.stringify(response));
 
-    if (response.status === "403" && uri.slice(-1) !== "/" && uri.slice(0 - directoryIndexKey.length) !== directoryIndexKey) {
-        // Add trailing slash
-        uri += '/';
+    if (emulateStaticWebsiteHosting) {
+        if (response.status === "403" && uri.slice(-1) !== "/" && uri.slice(0 - directoryIndexKey.length) !== directoryIndexKey) {
+            // Add trailing slash
+            uri += '/';
 
-        // Redirect
-        response.status = "301";
-        response.statusDescription = "Moved Permanently";
-        response.body = "";
-        response.headers["location"] = [{
-            key: "Location",
-            value: uri
-        }];
-        console.log("301 redirecting to ", uri);
+            // Redirect
+            response.status = "301";
+            response.statusDescription = "Moved Permanently";
+            response.body = "";
+            response.headers["location"] = [{
+                key: "Location",
+                value: uri
+            }];
+            console.log("301 redirecting to ", uri);
+        }
     }
+
+    if (preserveRedirectQuery) {
+        if (response.status[0] === "3" && response.headers.location && response.headers.location[0] && request.querystring) {
+            response.headers.location[0].value += "?" + request.querystring;
+        }
+    }
+
+    console.log("Final response", JSON.stringify(response));
 
     if (passthroughFunctionQualifiedArn) {
         var lambda = new LambdaClient({

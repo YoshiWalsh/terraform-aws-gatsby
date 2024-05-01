@@ -104,10 +104,13 @@ module "primary_cert" {
 
 locals {
     https = var.acm_certificate_arn != "" || var.iam_certificate_id != "" || var.issue_certificate
+    deploy_originrequest = var.use_private_bucket
+    deploy_originresponse = var.use_private_bucket || var.preserve_query_string_on_redirect
+    deploy_lambdas = local.deploy_originrequest || local.deploy_originresponse
 }
 
 resource "aws_iam_role" "lambda_role" {
-    count = var.use_private_bucket ? 1 : 0
+    count = local.deploy_lambdas ? 1 : 0
     
     name = "${replace("${var.domain}", ".", "-")}_lambda"
 
@@ -115,7 +118,7 @@ resource "aws_iam_role" "lambda_role" {
 }
 
 resource "aws_iam_role_policy" "lambda_role_policy" {
-    count = var.use_private_bucket ? 1 : 0
+    count = local.deploy_lambdas ? 1 : 0
     
     name = "${replace("${var.domain}", ".", "-")}_lambda"
     role = aws_iam_role.lambda_role[0].id
@@ -124,7 +127,7 @@ resource "aws_iam_role_policy" "lambda_role_policy" {
 }
 
 data "template_file" "originrequest_lambda_template" {
-    count = var.use_private_bucket ? 1 : 0
+    count = local.deploy_originrequest ? 1 : 0
     
     template = file("${path.module}/data/originrequest_lambda/index.js.tpl")
     vars = {
@@ -134,10 +137,10 @@ data "template_file" "originrequest_lambda_template" {
 }
 
 data "archive_file" "originrequest_lambda_archive" {
-    count = var.use_private_bucket ? 1 : 0
+    count = local.deploy_originrequest ? 1 : 0
     
     type = "zip"
-    output_path = "${path.module}/artifacts/originrequest_lambda.zip"
+    output_path = "${path.module}/artifacts/${replace("${var.domain}", ".", "-")}originrequest_lambda.zip"
 
     source {
         filename = "index.js"
@@ -146,9 +149,9 @@ data "archive_file" "originrequest_lambda_archive" {
 }
 
 resource "aws_lambda_function" "originrequest_lambda" {
-    count = var.use_private_bucket ? 1 : 0
+    count = local.deploy_originrequest ? 1 : 0
     
-    filename = "${path.module}/artifacts/originrequest_lambda.zip"
+    filename = "${path.module}/artifacts/${replace("${var.domain}", ".", "-")}originrequest_lambda.zip"
     function_name = "${replace("${var.domain}", ".", "-")}_originrequest"
     role = aws_iam_role.lambda_role[0].arn
     handler = "index.handler"
@@ -163,20 +166,22 @@ resource "aws_lambda_function" "originrequest_lambda" {
 }
 
 data "template_file" "originresponse_lambda_template" {
-    count = var.use_private_bucket ? 1 : 0
+    count = local.deploy_originresponse ? 1 : 0
     
     template = file("${path.module}/data/originresponse_lambda/index.js.tpl")
     vars = {
         index_document = var.index_document
         passthrough = var.cloudfront_lambda_originresponse_enabled ? var.cloudfront_lambda_originresponse_qualifiedarn : ""
+        preserveRedirectQuery = var.preserve_query_string_on_redirect ? "true" : "false"
+        emulateStaticWebsiteHosting = var.use_private_bucket ? "true" : "false"
     }
 }
 
 data "archive_file" "originresponse_lambda_archive" {
-    count = var.use_private_bucket ? 1 : 0
+    count = local.deploy_originresponse ? 1 : 0
     
     type = "zip"
-    output_path = "${path.module}/artifacts/originresponse_lambda.zip"
+    output_path = "${path.module}/artifacts/${replace("${var.domain}", ".", "-")}originresponse_lambda.zip"
 
     source {
         filename = "index.js"
@@ -185,9 +190,9 @@ data "archive_file" "originresponse_lambda_archive" {
 }
 
 resource "aws_lambda_function" "originresponse_lambda" {
-    count = var.use_private_bucket ? 1 : 0
+    count = local.deploy_originresponse ? 1 : 0
     
-    filename = "${path.module}/artifacts/originresponse_lambda.zip"
+    filename = "${path.module}/artifacts/${replace("${var.domain}", ".", "-")}originresponse_lambda.zip"
     function_name = "${replace("${var.domain}", ".", "-")}_originresponse"
     role = aws_iam_role.lambda_role[0].arn
     handler = "index.handler"
@@ -270,7 +275,7 @@ resource "aws_cloudfront_distribution" "static_distribution" {
             cookies {
                 forward = "none"
             }
-            query_string = false
+            query_string = var.preserve_query_string_on_redirect || var.pass_query_string
         }
 
         # User-supplied viewer functions are always used directly
@@ -294,9 +299,9 @@ resource "aws_cloudfront_distribution" "static_distribution" {
             }
         }
 
-        # User-supplied origin functions can only be used directly when not using a private bucket
+        # User-supplied origin functions can only be used directly when we don't need them ourselves
         dynamic lambda_function_association {
-            for_each = (!var.use_private_bucket && var.cloudfront_lambda_originrequest_enabled) ? [true] : []
+            for_each = (!local.deploy_originrequest && var.cloudfront_lambda_originrequest_enabled) ? [true] : []
 
             content {
                 event_type = "origin-request"
@@ -306,7 +311,7 @@ resource "aws_cloudfront_distribution" "static_distribution" {
         }
 
         dynamic lambda_function_association {
-            for_each = (!var.use_private_bucket && var.cloudfront_lambda_originresponse_enabled) ? [true] : []
+            for_each = (!local.deploy_originresponse && var.cloudfront_lambda_originresponse_enabled) ? [true] : []
 
             content {
                 event_type = "origin-response"
@@ -320,7 +325,7 @@ resource "aws_cloudfront_distribution" "static_distribution" {
         # User-supplied origin functions are still supported via a
         # passthrough mechanism in the Lambda scripts.
         dynamic lambda_function_association {
-            for_each = var.use_private_bucket ? [true] : []
+            for_each = local.deploy_originrequest ? [true] : []
 
             content {
                 event_type = "origin-request"
@@ -330,7 +335,7 @@ resource "aws_cloudfront_distribution" "static_distribution" {
         }
 
         dynamic lambda_function_association {
-            for_each = var.use_private_bucket ? [true] : []
+            for_each = local.deploy_originresponse ? [true] : []
 
             content {
                 event_type = "origin-response"

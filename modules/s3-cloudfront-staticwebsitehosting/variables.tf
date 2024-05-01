@@ -1,6 +1,7 @@
 variable "domain" {
     type = string
     description = "The domain name to host the website at."
+    nullable = false
 }
 
 variable "acm_certificate_arn" {
@@ -19,42 +20,49 @@ variable "issue_certificate" {
     type = bool
     default = true
     description = "If set and no existing certificate is passed, a new certificate will be requested using DNS vallidation. Requires Route53 for validation. Does nothing if acm_certificate_arn or iam_certificate_id are specified."
+    nullable = false
 }
 
 variable "https_minimum_protocol_version" {
     type = string
     default = "TLSv1.1_2016" # Amazon's recommendation as of 2019-03-21
     description = "Controls which protocols and ciphers visitors are allowed to use. For more details, see https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/secure-connections-supported-viewer-protocols-ciphers.html#secure-connections-supported-ciphers"
+    nullable = false
 }
 
 variable "https_support_non_sni" {
     type = string
     default = false # Amazon's recommendation, and likely to stay Amazon's recommendation forever
     description = "Adds support for browsers which don't support SNI. Involves extra costs. Leaving this false is strongly recommended."
+    nullable = false
 }
 
 variable "https_redirect" {
     type = string
     default = "true"
     description = "If true, redirects HTTP requests to HTTPS. If false, allows both HTTP and HTTPS requests."
+    nullable = false
 }
 
 variable "cache_all_objects" {
     type = string
     default = false
     description = "Forces caching for all objects, including HTML files. Slightly improves load-times. If this is enabled, you MUST create a CloudFront Invalidation every time you update your site."
+    nullable = false
 }
 
 variable "index_document" {
     type = string
     default = "index.html"
     description = "The name of the index document within each directory."
+    nullable = false
 }
 
 variable "error_document" {
     type = string
     default = "404.html"
     description = "The path to the page that should be returned if the user requests a non-existent key."
+    nullable = false
 }
 
 variable "cloudfront_lambda_viewerrequest_enabled" {
@@ -127,4 +135,19 @@ variable "create_dns_records" {
     type = bool
     default = false
     description = "If enabled, DNS records will be created in Route53 automatically."
+    nullable = false
+}
+
+variable "preserve_query_string_on_redirect" {
+    type = bool
+    default = false
+    description = "If enabled, Lambda@Edge will be used to preserve the query string through redirects. DO NOT use this if you're using S3 SWH's 'redirect all requests' feature, as it will double the query string."
+    nullable = false
+}
+
+variable "pass_query_string" {
+    type = bool
+    default = false
+    description = "Enable this if you have a custom Lambda@Edge origin script that needs access to the query string. Also enable this if you're using S3 SWH's 'redirect all requests' feaature and wish to preserve the query string."
+    nullable = false
 }
