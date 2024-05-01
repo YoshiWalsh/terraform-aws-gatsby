@@ -106,9 +106,9 @@ variable "cloudfront_lambda_viewerresponse_qualifiedarn" {
 }
 
 variable "domain_route53_zones" {
-    type = map
-    default = {}
-    description = "Used to specify the existing Route53 zones to create each domain within. R53 zone names must include the trailing '.'"
+    type = list
+    default = []
+    description = "List of zone names of all R53 zones which we need to create domains in. Zone names must include the trailing '.'"
 }
 
 variable "create_dns_records" {

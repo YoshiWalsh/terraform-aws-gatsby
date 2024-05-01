@@ -8,6 +8,36 @@ terraform {
     }
 }
 
+locals {
+    domain_and_ancestors = [
+        for i, s in split(".", var.domain) :
+        join(
+            ".",
+            concat(
+                slice(
+                    split(
+                        ".",
+                        var.domain
+                    ),
+                    i,
+                    length(split(
+                        ".",
+                        var.domain
+                    ))
+                ),
+                [""]
+            )
+        )
+    ]
+    zone_name = coalesce([
+        for i, d in local.domain_and_ancestors :
+        contains(var.domain_route53_zones, d) ? d : null
+    ]...)
+
+    needs_cert = (var.issue_certificate && try(coalesce(var.acm_certificate_arn, var.iam_certificate_id), null) == null)
+    needs_r53 = local.needs_cert || var.create_dns_records
+}
+
 resource "aws_s3_bucket" "static_bucket" {
     count = var.existing_s3_bucket == null ? 1 : 0
 
@@ -80,14 +110,14 @@ resource "aws_s3_bucket_policy" "static_bucket_policy" {
 
 
 data "aws_route53_zone" "primary_zone" {
-    count = (var.issue_certificate && try(coalesce(var.acm_certificate_arn, var.iam_certificate_id), null) == null) ? 1 : 0
+    count = local.needs_r53 ? 1 : 0
 
-    name = lookup(var.domain_route53_zones, var.domain, var.domain)
+    name = local.zone_name
     private_zone = false
 }
 
 module "primary_cert" {
-    count = (var.issue_certificate && try(coalesce(var.acm_certificate_arn, var.iam_certificate_id), null) == null) ? 1 : 0
+    count = local.needs_cert ? 1 : 0
 
     source = "github.com/azavea/terraform-aws-acm-certificate?ref=4.0.0"
 
