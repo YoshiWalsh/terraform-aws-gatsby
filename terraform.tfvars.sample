@@ -2,3 +2,6 @@ canonical_domain = "www.example.com"
 domain_route53_zones = [
     "example.com."
 ]
+preview_site_users = {
+    "default" = "insecurepassword"
+}

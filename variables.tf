@@ -20,3 +20,15 @@ variable "redirect_sources" {
     default = []
     description = "A list of additional domains which will be configured to redirect to this domain."
 }
+
+variable "preview_site_users" {
+    type = map
+    default = null
+    description = "A map of username/password combinations for people that should be given access to the preview site. If this is null (default) the preview site will be disabled."
+}
+
+variable "preview_site_domain" {
+    type = string
+    default = null
+    description = "The domain that the preview site should reside at. Defaults to a 'preview.' subdomain of the canonical domain (without any www. prefix, if applicable)."
+}
