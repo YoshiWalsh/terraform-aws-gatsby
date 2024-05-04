@@ -46,7 +46,7 @@ module "staticwebsite" {
 resource "aws_s3_bucket" "redirect_bucket" {
     count = length(var.redirect_sources) > 0 ? 1 : 0
 
-    bucket_prefix = "${var.domain}-rdr"
+    bucket_prefix = "${substr(var.domain, 0, 33)}-rdr"
 }
 
 resource "aws_s3_bucket_website_configuration" "static_website_configuration" {
