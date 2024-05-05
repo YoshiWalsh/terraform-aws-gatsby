@@ -115,3 +115,132 @@ module "preview_site" {
 
     use_private_bucket = true
 }
+
+
+
+resource "aws_s3_bucket" "codepipeline_bucket" {
+	bucket_prefix = "${substr(var.domain, 0, 31)}-build"
+}
+
+resource "aws_s3_bucket_public_access_block" "codepipeline_bucket_publicaccess" {
+    bucket = aws_s3_bucket.codepipeline_bucket.id
+
+    block_public_acls = true
+    block_public_policy = true
+    ignore_public_acls = true
+    restrict_public_buckets = true
+}
+
+module "codebuild_preview" {
+	source = "./modules/gatsby-codebuild"
+
+	name = "${substr(var.canonical_domain, 0, 25)}-pre"
+	address = "https://${local.preview_domain}/"
+	bucket = module.preview_site.static_s3_bucket_name
+	codepipeline_bucket = aws_s3_bucket.codepipeline_bucket
+	cache_bucket = aws_s3_bucket.codepipeline_bucket
+	cloudfront_distribution = module.preview_site.cf_distribution_id
+}
+
+module "codebuild_production" {
+	source = "./modules/gatsby-codebuild"
+
+	name = "${substr(var.canonical_domain, 0, 25)}"
+	address = "https://${var.canonical_domain}/"
+	bucket = module.main_site.static_s3_bucket_name
+	codepipeline_bucket = aws_s3_bucket.codepipeline_bucket
+	cache_bucket = aws_s3_bucket.codepipeline_bucket
+	cloudfront_distribution = module.main_site.cf_distribution_id
+}
+
+resource "aws_codepipeline" "codepipeline" {
+	name = "${substr(var.canonical_domain, 0, 25)}"
+	role_arn = aws_iam_role.codepipeline_role.arn
+
+	pipeline_type = "V1"
+
+	artifact_store {
+		type = "S3"
+		location = aws_s3_bucket.codepipeline_bucket.bucket
+	}
+
+	stage {
+		name = "Source"
+
+		action {
+			name = "Source"
+			category = "Source"
+			owner = "AWS"
+			provider = var.git_provider == "CodeCommit" ? "CodeCommit" : "CodeStarSourceConnection"
+			version = "1"
+			output_artifacts = ["source_output"]
+
+			configuration = var.git_provider == "CodeCommit" ? {
+				RepositoryName = var.git_repository
+				BranchName = var.git_branch
+				PollForSourceChanges = true # TODO: Convert from polling pipeline https://docs.aws.amazon.com/codepipeline/latest/userguide/update-change-detection.html#update-change-detection-cli-codecommit
+				OutputArtifactFormat = "CODE_ZIP"
+			} : {
+				ConnectionArn = var.git_connection_arn
+				FullRepositoryId = var.git_repository
+				BranchName = var.git_branch
+				DetectChanges = true
+				OutputArtifactFormat = "CODE_ZIP"
+			}
+		}
+	}
+
+	stage {
+		name = "DeployPreview"
+
+		action {
+			name = "DeployPreview"
+			category = "Build"
+			owner = "AWS"
+			provider = "CodeBuild"
+			input_artifacts = ["source_output"]
+			output_artifacts = ["preview_build_output"]
+			version = "1"
+
+			configuration = {
+				ProjectName = module.codebuild_preview.codebuild_project_name
+			}
+		}
+	}
+
+	stage {
+		name = "Approval"
+
+		action {
+			name = "Approval"
+			category = "Approval"
+			owner = "AWS"
+			provider = "Manual"
+			input_artifacts = []
+			output_artifacts = []
+			version = "1"
+
+			configuration = {
+				ExternalEntityLink = "https://${local.preview_domain}/"
+			}
+		}
+	}
+
+	stage {
+		name = "DeployProduction"
+
+		action {
+			name = "DeployProduction"
+			category = "Build"
+			owner = "AWS"
+			provider = "CodeBuild"
+			input_artifacts = ["source_output"]
+			output_artifacts = ["production_build_output"]
+			version = "1"
+
+			configuration = {
+				ProjectName = module.codebuild_production.codebuild_project_name
+			}
+		}
+	}
+}
