@@ -41,7 +41,7 @@ locals {
 resource "aws_s3_bucket" "static_bucket" {
     count = var.existing_s3_bucket == null ? 1 : 0
 
-    bucket_prefix = "${substr(var.domain, 0, 36)}-"
+    bucket_prefix = "${replace(substr(var.domain, 0, 36), ".", "-")}-"
 }
 
 data "aws_s3_bucket" "existing_bucket" {

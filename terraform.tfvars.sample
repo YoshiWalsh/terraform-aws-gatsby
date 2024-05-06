@@ -5,3 +5,6 @@ domain_route53_zones = [
 preview_site_users = {
     "default" = "insecurepassword"
 }
+git_provider = "CodeCommit"
+git_repository = "example-site"
+git_branch = "production"
