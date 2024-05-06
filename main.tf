@@ -119,7 +119,7 @@ module "preview_site" {
 
 
 resource "aws_s3_bucket" "codepipeline_bucket" {
-	bucket_prefix = "${substr(var.domain, 0, 31)}-build"
+	bucket_prefix = "${replace(substr(var.canonical_domain, 0, 31), ".", "-")}-build"
 }
 
 resource "aws_s3_bucket_public_access_block" "codepipeline_bucket_publicaccess" {
@@ -132,25 +132,60 @@ resource "aws_s3_bucket_public_access_block" "codepipeline_bucket_publicaccess" 
 }
 
 module "codebuild_preview" {
+    count = var.preview_site_users != null ? 1 : 0
+
 	source = "./modules/gatsby-codebuild"
 
-	name = "${substr(var.canonical_domain, 0, 25)}-pre"
+	name = "${replace(substr(var.canonical_domain, 0, 25), ".", "-")}-pre"
 	address = "https://${local.preview_domain}/"
-	bucket = module.preview_site.static_s3_bucket_name
-	codepipeline_bucket = aws_s3_bucket.codepipeline_bucket
-	cache_bucket = aws_s3_bucket.codepipeline_bucket
-	cloudfront_distribution = module.preview_site.cf_distribution_id
+	bucket = module.preview_site[0].static_s3_bucket_name
+	codepipeline_bucket = aws_s3_bucket.codepipeline_bucket.id
+	cache_bucket = aws_s3_bucket.codepipeline_bucket.id
+	cloudfront_distribution = module.preview_site[0].cf_distribution_id
 }
 
 module "codebuild_production" {
 	source = "./modules/gatsby-codebuild"
 
-	name = "${substr(var.canonical_domain, 0, 25)}"
+	name = "${replace(substr(var.canonical_domain, 0, 25), ".", "-")}"
 	address = "https://${var.canonical_domain}/"
 	bucket = module.main_site.static_s3_bucket_name
-	codepipeline_bucket = aws_s3_bucket.codepipeline_bucket
-	cache_bucket = aws_s3_bucket.codepipeline_bucket
+	codepipeline_bucket = aws_s3_bucket.codepipeline_bucket.id
+	cache_bucket = aws_s3_bucket.codepipeline_bucket.id
 	cloudfront_distribution = module.main_site.cf_distribution_id
+}
+
+
+data "aws_iam_policy_document" "assume_codepipeline_role" {
+    statement {
+        effect = "Allow"
+
+        principals {
+            type = "Service"
+            identifiers = ["codepipeline.amazonaws.com"]
+        }
+
+        actions = ["sts:AssumeRole"]
+    }
+}
+
+resource "aws_iam_role" "codepipeline_role" {
+    name = "codepipeline-${substr(var.canonical_domain, 0, 25)}"
+    assume_role_policy = data.aws_iam_policy_document.assume_codepipeline_role.json
+}
+
+data "template_file" "codepipeline_policy_template" {
+    template = file("${path.module}/data/codepipeline-pipeline-policy.json.tpl")
+    vars = {
+        # TODO: Lock these permissions down
+    }
+}
+
+resource "aws_iam_role_policy" "codepipeline_policy" {
+    name = "codepipeline-${substr(var.canonical_domain, 0, 25)}"
+    role = aws_iam_role.codepipeline_role.id
+
+    policy = data.template_file.codepipeline_policy_template.rendered
 }
 
 resource "aws_codepipeline" "codepipeline" {
@@ -161,7 +196,7 @@ resource "aws_codepipeline" "codepipeline" {
 
 	artifact_store {
 		type = "S3"
-		location = aws_s3_bucket.codepipeline_bucket.bucket
+		location = aws_s3_bucket.codepipeline_bucket.id
 	}
 
 	stage {
@@ -190,22 +225,27 @@ resource "aws_codepipeline" "codepipeline" {
 		}
 	}
 
-	stage {
-		name = "DeployPreview"
+	dynamic stage {
+        for_each = var.preview_site_users != null ? [true] : []
 
-		action {
-			name = "DeployPreview"
-			category = "Build"
-			owner = "AWS"
-			provider = "CodeBuild"
-			input_artifacts = ["source_output"]
-			output_artifacts = ["preview_build_output"]
-			version = "1"
 
-			configuration = {
-				ProjectName = module.codebuild_preview.codebuild_project_name
-			}
-		}
+        content {
+            name = "DeployPreview"
+
+            action {
+                name = "DeployPreview"
+                category = "Build"
+                owner = "AWS"
+                provider = "CodeBuild"
+                input_artifacts = ["source_output"]
+                output_artifacts = ["preview_build_output"]
+                version = "1"
+
+                configuration = {
+                    ProjectName = module.codebuild_preview[0].codebuild_project_name
+                }
+            }
+        }
 	}
 
 	stage {

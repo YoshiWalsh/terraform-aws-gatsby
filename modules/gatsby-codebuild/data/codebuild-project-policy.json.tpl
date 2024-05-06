@@ -5,8 +5,9 @@
             "Sid": "CodeBuildLogging",
             "Effect": "Allow",
             "Resource": [
-                "arn:aws:logs:::log-group:/aws/codebuild/${name}",
-                "arn:aws:logs:::log-group:/aws/codebuild/${name}:*"
+                "arn:aws:logs:*:*:log-group:/aws/codebuild/${name}",
+                "arn:aws:logs:*:*:log-group:/aws/codebuild/${name}:*",
+                "arn:aws:logs:*:*:log-group:/aws/codebuild/${name}:log-stream:*"
             ],
             "Action": [
                 "logs:CreateLogGroup",
@@ -32,7 +33,7 @@
             "Sid": "CodeBuildReports",
             "Effect": "Allow",
             "Resource": [
-                "arn:aws:codebuild:::report-group/${name}-*"
+                "arn:aws:codebuild:*:*:report-group/${name}-*"
             ],
             "Action": [
                 "codebuild:CreateReportGroup",
@@ -62,7 +63,7 @@
             "Sid": "CloudFrontInvalidations",
             "Effect": "Allow",
             "Resource": [
-                "arn:aws:cloudfront:::distribution/${cloudfront_distribution}"
+                "arn:aws:cloudfront:*:*:distribution/${cloudfront_distribution}"
             ],
             "Action": [
                 "cloudfront:GetInvalidation",

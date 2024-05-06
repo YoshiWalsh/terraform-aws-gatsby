@@ -12,12 +12,12 @@ data "aws_iam_policy_document" "assume_role" {
 }
 
 resource "aws_iam_role" "role" {
-    name = "example"
+    name = "codebuild-${var.name}"
     assume_role_policy = data.aws_iam_policy_document.assume_role.json
 }
 
 data "template_file" "policy_template" {
-    template = file("${path.module}/data/codebuild-project-policy.tpl")
+    template = file("${path.module}/data/codebuild-project-policy.json.tpl")
     vars = {
         name = var.name
         codepipeline_artifact_bucket = var.codepipeline_bucket
@@ -28,7 +28,7 @@ data "template_file" "policy_template" {
 }
 
 resource "aws_iam_role_policy" "policy" {
-    name = "codebuild_${var.name}"
+    name = "codebuild-${var.name}"
     role = aws_iam_role.role.id
 
     policy = data.template_file.policy_template.rendered
@@ -42,7 +42,7 @@ resource "aws_codebuild_project" "project" {
     service_role = aws_iam_role.role.arn
 
     artifacts {
-        type = "NO_ARTIFACTS"
+        type = "CODEPIPELINE"
     }
 
     cache {
@@ -53,7 +53,7 @@ resource "aws_codebuild_project" "project" {
     environment {
         type = "LINUX_CONTAINER"
         compute_type = "BUILD_GENERAL1_SMALL"
-        image = "aws/codebuild/amazonlinux2-x86_64-standard:4.0"
+        image = "aws/codebuild/amazonlinux2-x86_64-standard:5.0"
         image_pull_credentials_type = "CODEBUILD"
         privileged_mode = false
 

@@ -9,3 +9,7 @@ output "cf_distribution_domain" {
 output "cf_distribution_zone_id" {
     value = module.staticwebsite.cf_distribution_zone_id
 }
+
+output "cf_distribution_id" {
+    value = module.staticwebsite.cf_distribution_id
+}

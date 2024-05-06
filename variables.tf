@@ -36,7 +36,6 @@ variable "preview_site_domain" {
 variable "git_provider" {
     type = string
     description = "The Git repository provider. Supported values: "
-    nullable = false
     validation {
         condition = contains(["CodeCommit", "Bitbucket", "GitHub", "GitLab", "GitHub Enterprise Server", "GitLab self-managed"], var.git_provider)
         error_message = "Unsupported git_provider value"
@@ -52,14 +51,12 @@ variable "git_connection_arn" {
 
 variable "git_repository" {
     type = string
-    default = null
     description = "Full name of repository containing Gatsby project."
     nullable = false
 }
 
 variable "git_branch" {
     type = string
-    default = null
     description = "Git branch to build from."
     nullable = false
 }
