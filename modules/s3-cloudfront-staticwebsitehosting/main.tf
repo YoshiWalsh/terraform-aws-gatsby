@@ -180,6 +180,8 @@ data "archive_file" "originrequest_lambda_archive" {
 
 resource "aws_lambda_function" "originrequest_lambda" {
     count = local.deploy_originrequest ? 1 : 0
+
+    provider = aws.certificates
     
     filename = "${path.module}/artifacts/${replace("${var.domain}", ".", "-")}originrequest_lambda.zip"
     function_name = "${replace("${var.domain}", ".", "-")}_originrequest"
@@ -221,6 +223,8 @@ data "archive_file" "originresponse_lambda_archive" {
 
 resource "aws_lambda_function" "originresponse_lambda" {
     count = local.deploy_originresponse ? 1 : 0
+
+    provider = aws.certificates
     
     filename = "${path.module}/artifacts/${replace("${var.domain}", ".", "-")}originresponse_lambda.zip"
     function_name = "${replace("${var.domain}", ".", "-")}_originresponse"

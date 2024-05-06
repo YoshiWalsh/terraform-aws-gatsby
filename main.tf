@@ -63,6 +63,8 @@ data "archive_file" "preview_viewerrequest_lambda_archive" {
 
 resource "aws_lambda_function" "preview_viewerrequest_lambda" {
     count = var.preview_site_users != null ? 1 : 0
+
+    provider = aws.certificates
     
     filename = "${path.module}/artifacts/${random_id.environment_identifier.hex}_viewerrequest_lambda.zip"
     function_name = "gatsby_${random_id.environment_identifier.hex}_viewerrequest"
