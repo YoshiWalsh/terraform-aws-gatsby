@@ -1,10 +1,11 @@
-provider "aws" {
-    region = var.region
-}
-
-provider "aws" {
-    alias = "certificates"
-    region = "us-east-1"
+terraform {
+    required_providers {
+        aws = {
+            source  = "hashicorp/aws"
+            version = ">= 5.0.0"
+            configuration_aliases = [ aws, aws.certificates ]
+        }
+    }
 }
 
 resource "random_id" "environment_identifier" {
