@@ -1,19 +1,21 @@
-variable "domain" {
-    type = string
-    description = "The domain name to host the website at."
+variable "domains" {
+    type = list
+    description = "The domain names to host the website at."
     nullable = false
 }
 
-variable "acm_certificate_arn" {
-    type = string
-    default = ""
-    description = "The ARN of the ACM certificate to use when serving pages via HTTPS."
+variable "acm_certificate_arns" {
+    type = map
+    default = {}
+    description = "The ARNs of the ACM certificate to use when serving pages via HTTPS, keyed by domain."
+    nullable = false
 }
 
-variable "iam_certificate_id" {
-    type = string
-    default = ""
-    description = "The ID of the IAM certificate to use when serving pages via HTTPS."
+variable "iam_certificate_ids" {
+    type = map
+    default = {}
+    description = "The IDs of the IAM certificate to use when serving pages via HTTPS, keyed by domain."
+    nullable = false
 }
 
 variable "issue_certificate" {

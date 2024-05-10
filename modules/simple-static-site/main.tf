@@ -23,7 +23,7 @@ module "staticwebsite" {
         aws.certificates = aws.certificates
     }
 
-    domain = var.domain
+    domains = [var.domain]
     cache_all_objects = true
     index_document = "index.html"
     error_document = "404.html"
@@ -72,7 +72,7 @@ resource "aws_s3_bucket_public_access_block" "static_bucket_publicaccess" {
 }
 
 module "redirect" {
-    for_each = toset(var.redirect_sources)
+    count = length(var.redirect_sources) > 0 ? 1 : 0
 
     source = "../s3-cloudfront-staticwebsitehosting"
 
@@ -81,7 +81,7 @@ module "redirect" {
         aws.certificates = aws.certificates
     }
 
-    domain = each.key
+    domains = var.redirect_sources
     existing_s3_bucket = coalesce(aws_s3_bucket.redirect_bucket[0].id, "NOTUSED") # Using coalesce here allows us to guarantee to Terraform that this value will not be null
     cache_all_objects = true
 
