@@ -4,18 +4,16 @@ variable "domains" {
     nullable = false
 }
 
-variable "acm_certificate_arns" {
-    type = map
-    default = {}
-    description = "The ARNs of the ACM certificate to use when serving pages via HTTPS, keyed by domain."
-    nullable = false
+variable "acm_certificate_arn" {
+    type = string
+    default = null
+    description = "The ARN of the ACM certificate to use when serving pages via HTTPS. If specified, must cover all specified domains."
 }
 
-variable "iam_certificate_ids" {
-    type = map
-    default = {}
-    description = "The IDs of the IAM certificate to use when serving pages via HTTPS, keyed by domain."
-    nullable = false
+variable "iam_certificate_id" {
+    type = string
+    default = null
+    description = "The ID of the IAM certificate to use when serving pages via HTTPS. If specified, must cover all specified domains."
 }
 
 variable "issue_certificate" {

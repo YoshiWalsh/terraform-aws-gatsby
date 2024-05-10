@@ -55,31 +55,8 @@ check "domain_zones" {
 }
 
 locals {
-    domains_needing_certs = var.issue_certificate ? [
-        for domain in var.domains :
-        domain
-        if lookup(var.acm_certificate_arns, domain, null) == null && lookup(var.iam_certificate_ids, domain, null) == null
-    ] : []
-    domain_zones_needing_certs = {
-        for domain in local.domains_needing_certs :
-        domain => lookup(local.domain_zone_name, domain, null)
-    }
-    zones_needing_certs = values(local.domain_zones_needing_certs)
-    all_zones_with_domains_needing_certs = {
-        for zone in local.zones_needing_certs :
-        zone => [
-            for domain, zone_name in local.domain_zones_needing_certs :
-            domain
-            if zone == zone_name
-        ]
-    }
-    zones_with_domains_needing_certs = {
-        for zone, domains in local.all_zones_with_domains_needing_certs :
-        zone => domains
-        if length(domains) > 0
-    }
-
-    needs_r53 = (length(local.domains_needing_certs) > 0) || var.create_dns_records
+    needs_cert = var.acm_certificate_arn == null && var.iam_certificate_id == null && var.issue_certificate
+    needs_r53 = local.needs_cert || var.create_dns_records
 
     domain = var.domains[0]
 }
@@ -163,23 +140,21 @@ data "aws_route53_zone" "zones" {
 }
 
 module "cert" {
-    for_each = local.zones_with_domains_needing_certs
+    count = local.needs_cert ? 1 : 0
 
-    source = "github.com/azavea/terraform-aws-acm-certificate?ref=4.0.0"
+    source = "../dns-validated-certificate"
 
     providers = {
-        aws.acm_account = aws.certificates
-        aws.route53_account = aws
+        aws = aws
+        aws.certificates = aws.certificates
     }
 
-    domain_name = each.value[0]
-    subject_alternative_names = slice(each.value, 1, length(each.value))
-    hosted_zone_id = lookup(data.aws_route53_zone.zones, each.key, null).zone_id
-    validation_record_ttl = "60"
+    domains = var.domains
+    route53_zone_names = var.domain_route53_zones
 }
 
 locals {
-    https = length(keys(var.acm_certificate_arns)) > 0 || length(keys(var.iam_certificate_ids)) > 0 || var.issue_certificate
+    https = var.acm_certificate_arn != null || var.iam_certificate_id != null || var.issue_certificate
     deploy_originrequest = var.use_private_bucket
     deploy_originresponse = var.use_private_bucket || var.preserve_query_string_on_redirect
     deploy_lambdas = local.deploy_originrequest || local.deploy_originresponse
@@ -335,35 +310,12 @@ resource "aws_cloudfront_distribution" "static_distribution" {
         }
     }
 
-    dynamic viewer_certificate {
-        for_each = data.aws_route53_zone.zones
-
-        content {
-            acm_certificate_arn = viewer_certificate.value.arn
-            minimum_protocol_version = var.https_minimum_protocol_version
-            ssl_support_method = var.https_support_non_sni ? "vip" : "sni-only"
-        }
-    }
-
-    dynamic viewer_certificate {
-        for_each = var.acm_certificate_arns
-
-        content {
-            acm_certificate_arn = viewer_certificate.value
-            minimum_protocol_version = var.https_minimum_protocol_version
-            ssl_support_method = var.https_support_non_sni ? "vip" : "sni-only"
-        }
-    }
-
-    dynamic viewer_certificate {
-        for_each = var.iam_certificate_ids
-
-        content {
-            iam_certificate_id = viewer_certificate.value
-            minimum_protocol_version = var.https_minimum_protocol_version
-            ssl_support_method = var.https_support_non_sni ? "vip" : "sni-only"
-        }
-    }
+    viewer_certificate { 
+        acm_certificate_arn = try(module.cert[0].arn, var.acm_certificate_arn, null) 
+        iam_certificate_id = var.iam_certificate_id 
+        minimum_protocol_version = var.https_minimum_protocol_version 
+        ssl_support_method = var.https_support_non_sni ? "vip" : "sni-only" 
+    } 
 
     default_cache_behavior {
         target_origin_id = "main"
@@ -456,7 +408,7 @@ resource "aws_cloudfront_distribution" "static_distribution" {
 }
 
 resource "aws_route53_record" "main_dns_ipv4" {
-    for_each = var.create_dns_records ? local.domain_zone_name : []
+    for_each = var.create_dns_records ? local.domain_zone_name : {}
 
     zone_id = data.aws_route53_zone.zones[each.value].id
     name = each.key
@@ -470,7 +422,7 @@ resource "aws_route53_record" "main_dns_ipv4" {
 }
 
 resource "aws_route53_record" "main_dns_ipv6" {
-    for_each = var.create_dns_records ? local.domain_zone_name : []
+    for_each = var.create_dns_records ? local.domain_zone_name : {}
 
     zone_id = data.aws_route53_zone.zones[each.value].id
     name = each.key
