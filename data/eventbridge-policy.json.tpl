@@ -1,0 +1,12 @@
+{
+	"Version": "2012-10-17",
+	"Statement": [
+		{
+			"Action": [
+				"codepipeline:StartPipelineExecution"
+			],
+			"Effect": "Allow",
+			"Resource": "${pipelineArn}"
+		}
+	]
+}
