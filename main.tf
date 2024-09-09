@@ -216,7 +216,7 @@ resource "aws_codepipeline" "codepipeline" {
 			configuration = var.git_provider == "CodeCommit" ? {
 				RepositoryName = var.git_repository
 				BranchName = var.git_branch
-				PollForSourceChanges = true # TODO: Convert from polling pipeline https://docs.aws.amazon.com/codepipeline/latest/userguide/update-change-detection.html#update-change-detection-cli-codecommit
+				PollForSourceChanges = false
 				OutputArtifactFormat = "CODE_ZIP"
 			} : {
 				ConnectionArn = var.git_connection_arn
@@ -286,4 +286,66 @@ resource "aws_codepipeline" "codepipeline" {
 			}
 		}
 	}
+}
+
+locals {
+    deploy_eventbridge = var.git_provider == "CodeCommit"
+}
+
+data "template_file" "eventbridge_policy_template" {
+    count = local.deploy_eventbridge ? 1 : 0
+
+    template = file("${path.module}/data/eventbridge-policy.json.tpl")
+    vars = {
+        pipelineArn = aws_codepipeline.codepipeline.arn
+    }
+}
+
+data "aws_codecommit_repository" "codecommit_repo" {
+    count = local.deploy_eventbridge ? 1 : 0
+
+    repository_name = var.git_repository
+}
+
+resource "aws_iam_role" "eventbridge_role" {
+    count = local.deploy_eventbridge ? 1 : 0
+    
+    name = "${replace(substr(var.canonical_domain, 0, 25), ".", "-")}_eventbridge"
+
+    assume_role_policy = file("${path.module}/data/eventbridge-assumepolicy.json")
+}
+
+resource "aws_iam_role_policy" "eventbridge_role_policy" {
+    count = local.deploy_eventbridge ? 1 : 0
+    
+    name = "${replace(substr(var.canonical_domain, 0, 25), ".", "-")}_eventbridge"
+    role = aws_iam_role.eventbridge_role[0].id
+
+    policy = data.template_file.eventbridge_policy_template[0].rendered
+}
+
+resource "aws_cloudwatch_event_rule" "eventbridge_rule" {
+    count = local.deploy_eventbridge ? 1 : 0
+
+    name = "${substr(var.canonical_domain, 0, 25)}-changes"
+    description = "Detect changes in repository and trigger CodePipeline"
+
+    event_pattern = jsonencode({
+        source = ["aws.codecommit"]
+        detail-type = ["CodeCommit Repository State Change"]
+        resources = [data.aws_codecommit_repository.codecommit_repo[0].arn]
+        detail = {
+            referenceType = ["branch"]
+            referenceName = [var.git_branch]
+        }
+    })
+}
+
+resource "aws_cloudwatch_event_target" "eventbridge_target" {
+    count = local.deploy_eventbridge ? 1 : 0
+
+    rule = aws_cloudwatch_event_rule.eventbridge_rule[0].name
+    arn = aws_codepipeline.codepipeline.arn
+
+    role_arn = aws_iam_role.eventbridge_role[0].arn
 }
