@@ -9,39 +9,62 @@ terraform {
 }
 
 locals {
-    domain_and_ancestors = [
-        for i, s in split(".", var.domain) :
-        join(
-            ".",
-            concat(
-                slice(
-                    split(
-                        ".",
-                        var.domain
+    domains_and_ancestors = {
+        for domain in var.domains :
+        domain => [
+            for i, s in split(".", domain) :
+            join(
+                ".",
+                concat(
+                    slice(
+                        split(
+                            ".",
+                            domain
+                        ),
+                        i,
+                        length(split(
+                            ".",
+                            domain
+                        ))
                     ),
-                    i,
-                    length(split(
-                        ".",
-                        var.domain
-                    ))
-                ),
-                [""]
+                    [""]
+                )
             )
-        )
+        ]
+    }
+    domain_zone_name = {
+        for domain, domain_and_ancestors in local.domains_and_ancestors :
+        domain => try(coalesce([
+            for i, d in domain_and_ancestors :
+            contains(var.domain_route53_zones, d) ? d : null
+        ]...), null)
+    }
+    domains_missing_zones = [
+        for domain, zone in local.domain_zone_name :
+        domain
+        if zone == null
     ]
-    zone_name = coalesce([
-        for i, d in local.domain_and_ancestors :
-        contains(var.domain_route53_zones, d) ? d : null
-    ]...)
+    zones = values(local.domain_zone_name)
+}
 
-    needs_cert = (var.issue_certificate && try(coalesce(var.acm_certificate_arn, var.iam_certificate_id), null) == null)
+check "domain_zones" {
+    assert {
+        condition = length(local.domains_missing_zones) == 0
+        error_message = "domain_route53_zones is missing an entry for one or more specified domains: ${join(", ", local.domains_missing_zones)}"
+    }
+}
+
+locals {
+    needs_cert = var.acm_certificate_arn == null && var.iam_certificate_id == null && var.issue_certificate
     needs_r53 = local.needs_cert || var.create_dns_records
+
+    domain = var.domains[0]
 }
 
 resource "aws_s3_bucket" "static_bucket" {
     count = var.existing_s3_bucket == null ? 1 : 0
 
-    bucket_prefix = "${replace(substr(var.domain, 0, 36), ".", "-")}-"
+    bucket_prefix = "${replace(substr(local.domain, 0, 36), ".", "-")}-"
 }
 
 data "aws_s3_bucket" "existing_bucket" {
@@ -76,7 +99,7 @@ resource "aws_s3_bucket_public_access_block" "static_bucket_publicaccess" {
 resource "aws_cloudfront_origin_access_identity" "oai" {
     count = (var.use_private_bucket && var.existing_s3_bucket == null) ? 1 : 0
     
-    comment = var.domain
+    comment = local.domain
 }
 
 data "aws_iam_policy_document" "static_bucket_policy_document" {
@@ -109,31 +132,29 @@ resource "aws_s3_bucket_policy" "static_bucket_policy" {
 }
 
 
-data "aws_route53_zone" "primary_zone" {
-    count = local.needs_r53 ? 1 : 0
+data "aws_route53_zone" "zones" {
+    for_each = local.needs_r53 ? toset(local.zones) : toset([])
 
-    name = local.zone_name
+    name = each.key
     private_zone = false
 }
 
-module "primary_cert" {
+module "cert" {
     count = local.needs_cert ? 1 : 0
 
-    source = "github.com/azavea/terraform-aws-acm-certificate?ref=4.0.0"
+    source = "../dns-validated-certificate"
 
     providers = {
-        aws.acm_account = aws.certificates
-        aws.route53_account = aws
+        aws = aws
+        aws.certificates = aws.certificates
     }
 
-    domain_name = var.domain
-    subject_alternative_names = []
-    hosted_zone_id = data.aws_route53_zone.primary_zone[0].id
-    validation_record_ttl = "60"
+    domains = var.domains
+    route53_zone_names = var.domain_route53_zones
 }
 
 locals {
-    https = var.acm_certificate_arn != "" || var.iam_certificate_id != "" || var.issue_certificate
+    https = var.acm_certificate_arn != null || var.iam_certificate_id != null || var.issue_certificate
     deploy_originrequest = var.use_private_bucket
     deploy_originresponse = var.use_private_bucket || var.preserve_query_string_on_redirect
     deploy_lambdas = local.deploy_originrequest || local.deploy_originresponse
@@ -142,7 +163,7 @@ locals {
 resource "aws_iam_role" "lambda_role" {
     count = local.deploy_lambdas ? 1 : 0
     
-    name = "${replace("${var.domain}", ".", "-")}_lambda"
+    name = "${replace("${local.domain}", ".", "-")}_lambda"
 
     assume_role_policy = file("${path.module}/data/lambda_role_assumepolicy.json")
 }
@@ -150,7 +171,7 @@ resource "aws_iam_role" "lambda_role" {
 resource "aws_iam_role_policy" "lambda_role_policy" {
     count = local.deploy_lambdas ? 1 : 0
     
-    name = "${replace("${var.domain}", ".", "-")}_lambda"
+    name = "${replace("${local.domain}", ".", "-")}_lambda"
     role = aws_iam_role.lambda_role[0].id
 
     policy = file("${path.module}/data/lambda_role_policy.json")
@@ -170,7 +191,7 @@ data "archive_file" "originrequest_lambda_archive" {
     count = local.deploy_originrequest ? 1 : 0
     
     type = "zip"
-    output_path = "${path.module}/artifacts/${replace("${var.domain}", ".", "-")}originrequest_lambda.zip"
+    output_path = "${path.module}/artifacts/${replace("${local.domain}", ".", "-")}originrequest_lambda.zip"
 
     source {
         filename = "index.js"
@@ -183,8 +204,8 @@ resource "aws_lambda_function" "originrequest_lambda" {
 
     provider = aws.certificates
     
-    filename = "${path.module}/artifacts/${replace("${var.domain}", ".", "-")}originrequest_lambda.zip"
-    function_name = "${replace("${var.domain}", ".", "-")}_originrequest"
+    filename = "${path.module}/artifacts/${replace("${local.domain}", ".", "-")}originrequest_lambda.zip"
+    function_name = "${replace("${local.domain}", ".", "-")}_originrequest"
     role = aws_iam_role.lambda_role[0].arn
     handler = "index.handler"
 
@@ -213,7 +234,7 @@ data "archive_file" "originresponse_lambda_archive" {
     count = local.deploy_originresponse ? 1 : 0
     
     type = "zip"
-    output_path = "${path.module}/artifacts/${replace("${var.domain}", ".", "-")}originresponse_lambda.zip"
+    output_path = "${path.module}/artifacts/${replace("${local.domain}", ".", "-")}originresponse_lambda.zip"
 
     source {
         filename = "index.js"
@@ -226,8 +247,8 @@ resource "aws_lambda_function" "originresponse_lambda" {
 
     provider = aws.certificates
     
-    filename = "${path.module}/artifacts/${replace("${var.domain}", ".", "-")}originresponse_lambda.zip"
-    function_name = "${replace("${var.domain}", ".", "-")}_originresponse"
+    filename = "${path.module}/artifacts/${replace("${local.domain}", ".", "-")}originresponse_lambda.zip"
+    function_name = "${replace("${local.domain}", ".", "-")}_originresponse"
     role = aws_iam_role.lambda_role[0].arn
     handler = "index.handler"
 
@@ -242,7 +263,7 @@ resource "aws_lambda_function" "originresponse_lambda" {
 
 resource "aws_cloudfront_distribution" "static_distribution" {
     enabled = true
-    aliases = [var.domain]
+    aliases = var.domains
 
     http_version = "http2"
     is_ipv6_enabled = true
@@ -289,12 +310,12 @@ resource "aws_cloudfront_distribution" "static_distribution" {
         }
     }
 
-    viewer_certificate {
-        acm_certificate_arn = try(module.primary_cert[0].arn, var.acm_certificate_arn, null)
-        iam_certificate_id = var.iam_certificate_id
-        minimum_protocol_version = var.https_minimum_protocol_version
-        ssl_support_method = var.https_support_non_sni ? "vip" : "sni-only"
-    }
+    viewer_certificate { 
+        acm_certificate_arn = try(module.cert[0].arn, var.acm_certificate_arn, null) 
+        iam_certificate_id = var.iam_certificate_id 
+        minimum_protocol_version = var.https_minimum_protocol_version 
+        ssl_support_method = var.https_support_non_sni ? "vip" : "sni-only" 
+    } 
 
     default_cache_behavior {
         target_origin_id = "main"
@@ -387,10 +408,10 @@ resource "aws_cloudfront_distribution" "static_distribution" {
 }
 
 resource "aws_route53_record" "main_dns_ipv4" {
-    count = var.create_dns_records ? 1 : 0
+    for_each = var.create_dns_records ? local.domain_zone_name : {}
 
-    zone_id = data.aws_route53_zone.primary_zone[0].id
-    name = var.domain
+    zone_id = data.aws_route53_zone.zones[each.value].id
+    name = each.key
     type = "A"
     
     alias {
@@ -401,10 +422,10 @@ resource "aws_route53_record" "main_dns_ipv4" {
 }
 
 resource "aws_route53_record" "main_dns_ipv6" {
-    count = var.create_dns_records ? 1 : 0
+    for_each = var.create_dns_records ? local.domain_zone_name : {}
 
-    zone_id = data.aws_route53_zone.primary_zone[0].id
-    name = var.domain
+    zone_id = data.aws_route53_zone.zones[each.value].id
+    name = each.key
     type = "AAAA"
     
     alias {
