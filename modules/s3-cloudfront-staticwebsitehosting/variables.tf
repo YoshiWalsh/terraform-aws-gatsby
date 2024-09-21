@@ -151,3 +151,9 @@ variable "pass_query_string" {
     description = "Enable this if you have a custom Lambda@Edge origin script that needs access to the query string. Also enable this if you're using S3 SWH's 'redirect all requests' feaature and wish to preserve the query string."
     nullable = false
 }
+
+variable "single_page_app" {
+    type = bool
+    default = false
+    description = "Enabling this will cause 404 responses to instead return 200 with the index document. This is useful for sites using the History API."
+}

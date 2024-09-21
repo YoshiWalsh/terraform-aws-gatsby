@@ -41,6 +41,7 @@ module "staticwebsite" {
 
     use_private_bucket = var.use_private_bucket
     preserve_query_string_on_redirect = true
+    single_page_app = var.single_page_app
 }
 
 resource "aws_s3_bucket" "redirect_bucket" {

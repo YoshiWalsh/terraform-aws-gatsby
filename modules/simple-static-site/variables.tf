@@ -47,3 +47,9 @@ variable "use_private_bucket" {
     description = "Uses an Origin Access Identity and Lambda@Edge in order to replicate S3 Static Website Hosting functionality but with a private bucket."
     nullable = false
 }
+
+variable "single_page_app" {
+    type = bool
+    default = false
+    description = "Enabling this will cause 404 responses to instead return 200 with the index document. This is useful for sites using the History API."
+}

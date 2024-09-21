@@ -402,8 +402,18 @@ resource "aws_cloudfront_distribution" "static_distribution" {
 
     custom_error_response {
         error_code = 403
-        response_code = 404
-        response_page_path = "/${var.error_document}"
+        response_code = var.single_page_app ? 200 : 404
+        response_page_path = var.single_page_app ? "/${var.index_document}" : "/${var.error_document}"
+    }
+
+    dynamic custom_error_response {
+        for_each = var.single_page_app ? [true] : []
+
+        content {
+            error_code = 404
+            response_code = 200
+            response_page_path = "/${var.index_document}"
+        }
     }
 }
 
